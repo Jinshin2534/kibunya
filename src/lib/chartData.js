@@ -3,6 +3,8 @@
  * DOM にも SVG 文字列の組み立て自体にも触れず、数値の変換だけをする。
  */
 
+import { pearson } from './stats.js'
+
 /**
  * 配列を 0〜1 に正規化する（全部同じ値なら 0.5 の直線）。
  * 非有限値（NaN・Infinity）は 0 として扱ってから min/max を取る。
@@ -31,4 +33,23 @@ export function polylinePoints(values, n, width, height) {
   const x = (i) => (i / (n - 1)) * width
   const y = (v) => height - Math.max(0, Math.min(1, Number.isFinite(v) ? v : 0)) * height
   return values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')
+}
+
+/**
+ * 2つの系列の相関を、そのまま日本語にする。
+ *
+ * グラフは各系列を「その系列自身の最小〜最大」に引き伸ばして描くので、
+ * 無関係な2本でも形が似て見えることがある。だから形とは別に、
+ * 生の値から出した相関を数字で併記する。こちらが本当の答え。
+ */
+export function describeCorrelation(a, b) {
+  const r = pearson(a ?? [], b ?? [])
+  const v = Number.isFinite(r) ? r : 0
+  const m = Math.abs(v)
+  const strength = m >= 0.7 ? '強く一緒に動いています'
+    : m >= 0.4 ? 'そこそこ一緒に動いています'
+    : m >= 0.2 ? 'わずかに関係がありそうです'
+    : '関係は見えません'
+  const direction = m < 0.2 ? '' : v > 0 ? '同じ向きに' : '逆の向きに'
+  return { r: v, text: `相関 ${v >= 0 ? '＋' : '−'}${m.toFixed(2)} — ${direction}${strength}` }
 }

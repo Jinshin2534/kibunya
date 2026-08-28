@@ -1,4 +1,5 @@
 import { linesSvg, normalize } from './charts.js'
+import { describeCorrelation } from '../lib/chartData.js'
 import { FEATURE_NAMES, FEATURE_LABELS_JA } from '../lib/features.js'
 import { TARGETS } from '../lib/labels.js'
 import { similarDays } from '../lib/neighbors.js'
@@ -26,19 +27,26 @@ export function renderLog(root, { entries, trained }) {
         `<option value="${t.key}">${t.label}</option>`).join('')}</select>
     </div>
     <div class="chart-slot"></div>
+    <p class="line corr-slot"></p>
+    <p class="note">グラフは2本をそれぞれの最小〜最大に引き伸ばして重ねています。
+    形が似ていても関係があるとは限らないので、実際の相関を上に出しています。</p>
   `
   root.append(chart)
 
   const slot = chart.querySelector('.chart-slot')
+  const corrSlot = chart.querySelector('.corr-slot')
   const drawChart = () => {
     const f = chart.querySelector('.pick-feature').value
     const t = chart.querySelector('.pick-target').value
+    const rawA = entries.map((e) => e.z?.[f] ?? 0)
+    const rawB = entries.map((e) => e.labels?.[t] ?? 3)
     slot.innerHTML = linesSvg({
       series: [
-        { values: normalize(entries.map((e) => e.z?.[f] ?? 0)), color: 'var(--accent)', label: FEATURE_LABELS_JA[f] },
-        { values: normalize(entries.map((e) => e.labels?.[t] ?? 3)), color: 'var(--ok)', label: TARGETS.find((x) => x.key === t).label },
+        { values: normalize(rawA), color: 'var(--accent)', label: FEATURE_LABELS_JA[f] },
+        { values: normalize(rawB), color: 'var(--ok)', label: TARGETS.find((x) => x.key === t).label },
       ],
     })
+    corrSlot.textContent = describeCorrelation(rawA, rawB).text
   }
   chart.querySelector('.pick-feature').onchange = drawChart
   chart.querySelector('.pick-target').onchange = drawChart
