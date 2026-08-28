@@ -27,7 +27,11 @@ export function sampleFaceColors(image, landmarks, imageWidth, imageHeight, scal
     if (x > maxX) maxX = x
     if (y > maxY) maxY = y
   }
-  const step = Math.max(1, Math.round((scalePx || 8) / 8))
+  // 歩幅は顔の大きさに比例させる。scalePx が測れていないときは 1 画素刻みに倒す
+  // （粗く飛ばすより、遅くても正しい平均を返すほうがよい）。
+  const step = Number.isFinite(scalePx) && scalePx > 0
+    ? Math.max(1, Math.round(scalePx / 8))
+    : 1
   const faceMean = sampleGrid(image, {
     x: Math.max(0, Math.floor(minX)),
     y: Math.max(0, Math.floor(minY)),
