@@ -42,8 +42,8 @@
 
 - Vite + 素の JavaScript（ビルドツール以外のフレームワークなし）
 - Vitest（`src/lib` の純粋関数）
-- `@mediapipe/tasks-vision` の FaceLandmarker（478 landmarks + 52 blendshapes
-  + facialTransformationMatrix）
+- `@mediapipe/tasks-vision` の FaceLandmarker（478 landmarks + facialTransformationMatrix）
+  blendshapes は使わない。特徴量はすべて幾何と色から自分で作る
 - IndexedDB（記録・ベースライン・サムネイル・設定）
 - 開発ポート **5410**
 
@@ -96,7 +96,8 @@ src/
 - 原点 = 両目の中点
 - スケール = 両目の内眼角間距離を 1.0 とする
 - 回転 = 左右の目を結ぶ線が水平になるよう補正（roll 除去）
-- 頭の向き（yaw / pitch / roll）は `facialTransformationMatrix` から取り出す
+- 顔の向きは `facialTransformationMatrix` の前方向ベクトルから「正面からのズレ角」1 本で扱う
+  （Euler 角の分解規約に依存しないため。yaw と pitch をまとめて 1 つの数字にする）
 
 **不変性の要件**: 同じ顔を回転・拡大・平行移動した landmarks から、
 同一の特徴量が出ること（許容誤差 1e-6）。これはテストで保証する。
@@ -107,12 +108,11 @@ src/
 
 | 項目 | 条件 | 理由 |
 |---|---|---|
-| yaw | \|yaw\| ≤ 8° | 横を向くと片側の特徴量が潰れる |
-| pitch | \|pitch\| ≤ 8° | 上下向きで顔幅・まぶたが変わる |
+| 正面からのズレ | ≤ 10° | 横や上下を向くと片側の特徴量が潰れ、顔幅も変わる |
 | roll | \|roll\| ≤ 10° | 正規化で消せるが大きいと精度が落ちる |
 | 顔の大きさ | 内眼角距離が画面幅の 8〜20% | 小さすぎると分解能不足 |
 | 明るさ | 顔領域の平均輝度 60〜200 / 255 | 白飛び・黒潰れを弾く |
-| ブレ | 連続 5 フレームの landmark 移動量 < 閾値 | 動いている最中を撮らない |
+| ブレ | フレーム間の landmark 平均移動量 ≤ 0.006（正規化画像座標） | 動いている最中を撮らない |
 
 全項目が緑になったら 3 秒カウントダウンして自動シャッター。
 初回セットアップも毎日の撮影も **まったく同じゲートと同じ手順** を通す。
