@@ -23,7 +23,7 @@ const TABS = [
   { key: 'settings', label: '設定' },
 ]
 
-const state = { baseline: null, entries: [], trained: {}, tab: 'today', lastAnalysis: null, settings: null }
+const state = { baseline: null, entries: [], trained: {}, tab: 'today', lastAnalysis: null, settings: null, thumbCount: 0 }
 
 // renderToday が撮影中のカメラを掴んでいるとき、離脱時に確実に止めるためのハンドル。
 // 同じ画面を再描画するときも先に呼ぶ（前の撮影が生き残ったまま新しい撮影を
@@ -34,6 +34,7 @@ async function load() {
   state.baseline = await db.getBaseline()
   state.entries = await db.allEntries()
   state.settings = await db.getSettings()
+  state.thumbCount = await db.thumbCount()
   // 学習の X も、セットアップの 5 枚だけでなくこれまでの記録を混ぜ直した
   // 基準（Task 7 の pooledBaseline）で Z 化する。保存済みの entry.z は撮影時点の
   // 基準に固定されているので、基準が引き直されるたびに古い Z のまま学習することになる。
@@ -109,7 +110,7 @@ function render() {
 
   if (state.tab === 'settings') {
     renderSettings(root, {
-      settings: state.settings, entries: state.entries, baseline: state.baseline,
+      settings: state.settings, entries: state.entries, baseline: state.baseline, thumbCount: state.thumbCount,
       actions: {
         onClearAll: async () => {
           // clearAll は baseline/entries/thumbs/settings の4ストア全てを1つの
@@ -146,18 +147,22 @@ function render() {
           URL.revokeObjectURL(url)
         },
         onImport: async (file) => {
+          // JSON として壊れている場合は parseDumpJson が日本語のメッセージで投げる。
+          // 形は正しくても中身が不正な場合は db.importAll 側の isValidDump が
+          // 「読み込めるデータではありません」を投げる。どちらも err.message が
+          // そのまま日本語の文になっているので、alert にそのまま出せる。
+          // それ以外（IndexedDB の書き込み失敗など）は err.message が英語や
+          // 実装依存の文言になり得るので、生では出さず定型文にする。
+          const KNOWN_IMPORT_ERRORS = new Set(['JSON として読み取れないファイルです', '読み込めるデータではありません'])
           try {
-            // JSON として壊れている場合は parseDumpJson が日本語のメッセージで投げる。
-            // 形は正しくても中身が不正な場合は db.importAll 側の isValidDump が
-            // 「読み込めるデータではありません」を投げる。どちらも err.message が
-            // そのまま日本語の文になっているので、alert にそのまま出せる。
             const dump = parseDumpJson(await file.text())
             await db.importAll(dump)
             await load()
             state.tab = 'log'
             render()
           } catch (err) {
-            alert(`読み込めませんでした: ${err.message}`)
+            const message = KNOWN_IMPORT_ERRORS.has(err.message) ? err.message : '読み込み中に問題が発生しました'
+            alert(`読み込めませんでした: ${message}`)
           }
         },
       },

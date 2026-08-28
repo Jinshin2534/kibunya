@@ -1,10 +1,10 @@
-export function renderSettings(root, { settings, entries, baseline, actions }) {
+export function renderSettings(root, { settings, entries, baseline, thumbCount, actions }) {
   root.innerHTML = `
     <h1>設定</h1>
 
     <div class="panel danger-zone">
       <h2>すべて消す</h2>
-      <p class="note">記録 ${entries.length} 件、写真 ${settings.keepThumbnails ? 'あり' : 'なし'}、
+      <p class="note">記録 ${entries.length} 件、写真 ${thumbCount > 0 ? `${thumbCount} 枚` : 'なし'}、
       ベースライン ${baseline ? `${baseline.sampleCount} 枚` : 'なし'}。
       このデータはこの端末の中にだけあります。消すと元に戻せません。</p>
       <button class="danger" data-act="clear">全部消す</button>
@@ -21,8 +21,9 @@ export function renderSettings(root, { settings, entries, baseline, actions }) {
 
     <div class="panel">
       <h2>ふつうの顔を覚え直す</h2>
-      <p class="note">髪型・眼鏡・季節などで顔の写り方が変わったときに。撮り直すと、
-      これまでの記録の Z スコアは古い基準のままになります。</p>
+      <p class="note">髪型・眼鏡・季節などで顔の写り方が変わったときに。撮り直しても、
+      これまでの記録は新しい基準で測り直されます。ただし写り方が大きく変わっていると、
+      古い記録と混ざって当たりにくくなることがあります。</p>
       <button class="ghost" data-act="rebuild">撮り直す</button>
     </div>
 

@@ -54,6 +54,10 @@ export const allEntries = () =>
 
 export const getThumb = (date) => tx('thumbs', 'readonly', (s) => s.get(date))
 export const putThumb = (date, blob) => tx('thumbs', 'readwrite', (s) => s.put({ date, blob }))
+// count() は IDBObjectStore が持つ集計専用のリクエストで、行を1件も読み出さずに
+// 件数だけを返す。設定画面は数百枚の Blob を持つ利用者も開くので、getAll() で
+// 全件のサムネイルを読み出してから length を数えるのは避ける。
+export const thumbCount = () => tx('thumbs', 'readonly', (s) => s.count())
 
 const DEFAULT_SETTINGS = { id: 'app', keepThumbnails: true }
 export const getSettings = () =>
