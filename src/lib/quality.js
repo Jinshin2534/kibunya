@@ -46,7 +46,12 @@ export function checkQuality(input) {
       key: 'size', label: '顔の大きさ',
       ok: faceFound && Number.isFinite(scalePx) && Number.isFinite(imageWidth)
         && ratio >= T.scaleMin && ratio <= T.scaleMax,
-      hint: ratio < T.scaleMin ? 'もう少し近づいてください' : 'もう少し離れてください',
+      // scalePx が非有限（未測定）だと ratio は NaN になり、
+      // 「近づいて」「離れて」のどちらの比較も false になって
+      // 後者に転げ落ちてしまう（測っていないのに「離れて」と言う事故）。
+      // 未測定はどちらの方向にも倒さず、専用の文言にする。
+      hint: !Number.isFinite(scalePx) ? '顔の大きさを測れませんでした'
+        : ratio < T.scaleMin ? 'もう少し近づいてください' : 'もう少し離れてください',
     },
     {
       key: 'light', label: '明るさ',

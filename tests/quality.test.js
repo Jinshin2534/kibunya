@@ -161,6 +161,17 @@ describe('checkQuality — 未測定は不合格', () => {
     expect(keyOf(checkQuality({ ...good, scalePx: NaN }), 'size').ok).toBe(false)
   })
 
+  // scalePx が非有限（NaN）だと ratio = scalePx / imageWidth も NaN になり、
+  // 「近づいて」「離れて」のどちらの比較も false になって else 側
+  // （離れて）に転げ落ちてしまっていた。実際には測れていないだけなので、
+  // どちらの方向にも倒さない専用の文言であるべき。
+  it('scalePx が NaN（未測定）のときサイズのヒントは方向を示さない専用文言', () => {
+    const r = checkQuality({ ...good, scalePx: NaN })
+    const sizeCheck = keyOf(r, 'size')
+    expect(sizeCheck.ok).toBe(false)
+    expect(sizeCheck.hint).toBe('顔の大きさを測れませんでした')
+  })
+
   it('faceLuminance が未指定/NaN だと light が落ちる', () => {
     expect(keyOf(checkQuality({ ...good, faceLuminance: undefined }), 'light').ok).toBe(false)
     expect(keyOf(checkQuality({ ...good, faceLuminance: NaN }), 'light').ok).toBe(false)

@@ -43,6 +43,8 @@ export function renderLog(root, { entries, trained, baseline }) {
   const drawChart = () => {
     const f = chart.querySelector('.pick-feature').value
     const t = chart.querySelector('.pick-target').value
+    // 重ね描き用の折れ線は、アプリが書いた記録では起きない欠損を 0／3 で
+    // 埋めて連続な線を保つ（見た目だけの重ね合わせなので、そのまま）。
     const rawA = scaled.map((e) => e.z?.[f] ?? 0)
     const rawB = scaled.map((e) => e.labels?.[t] ?? 3)
     slot.innerHTML = linesSvg({
@@ -51,7 +53,17 @@ export function renderLog(root, { entries, trained, baseline }) {
         { values: normalize(rawB), color: 'var(--ok)', label: TARGETS.find((x) => x.key === t).label },
       ],
     })
-    corrSlot.textContent = describeCorrelation(rawA, rawB).text
+    // 相関は「実際にその両方の値がある」組だけで計算する。無ければ 0・3 に
+    // 倒して混ぜると、埋めた値そのものが相関を歪めてしまう（このブランチが
+    // 他の場所ではやめた「無ければ捏造する」パターン）。アプリ自身が書いた
+    // 記録では z も labels も欠けないが、インポートしたダンプには欠損があり得る。
+    const pairs = scaled
+      .map((e) => [e.z?.[f], e.labels?.[t]])
+      .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b))
+    const skipped = scaled.length - pairs.length
+    const corr = describeCorrelation(pairs.map(([a]) => a), pairs.map(([, b]) => b))
+    corrSlot.textContent = corr.text + (skipped
+      ? `（値が欠けている ${skipped} 件は相関の計算から除外）` : '')
   }
   chart.querySelector('.pick-feature').onchange = drawChart
   chart.querySelector('.pick-target').onchange = drawChart
