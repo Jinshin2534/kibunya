@@ -134,3 +134,53 @@ describe('checkQuality — guard tests', () => {
     expect(checkQuality({ ...good, motion: THRESHOLDS.motion }).ok).toBe(true)
   })
 })
+
+describe('checkQuality — 未測定は不合格', () => {
+  it('motion 以外は揃っていても motion 未指定だと ok にならない', () => {
+    const r = checkQuality({
+      faceFound: true, offAxisDeg: 3, rollDeg: 2,
+      scalePx: 84, imageWidth: 640, faceLuminance: 130,
+    })
+    expect(r.ok).toBe(false)
+    expect(keyOf(r, 'still').ok).toBe(false)
+  })
+
+  it('offAxisDeg が未指定/NaN だと direction が落ちる', () => {
+    expect(keyOf(checkQuality({ ...good, offAxisDeg: undefined }), 'direction').ok).toBe(false)
+    expect(keyOf(checkQuality({ ...good, offAxisDeg: NaN }), 'direction').ok).toBe(false)
+  })
+
+  it('rollDeg が未指定/NaN だと tilt が落ちる', () => {
+    expect(keyOf(checkQuality({ ...good, rollDeg: undefined }), 'tilt').ok).toBe(false)
+    expect(keyOf(checkQuality({ ...good, rollDeg: NaN }), 'tilt').ok).toBe(false)
+  })
+
+  it('scalePx が未指定/NaN だと size が落ちる', () => {
+    expect(keyOf(checkQuality({ ...good, scalePx: undefined }), 'size').ok).toBe(false)
+    expect(keyOf(checkQuality({ ...good, scalePx: NaN }), 'size').ok).toBe(false)
+  })
+
+  it('faceLuminance が未指定/NaN だと light が落ちる', () => {
+    expect(keyOf(checkQuality({ ...good, faceLuminance: undefined }), 'light').ok).toBe(false)
+    expect(keyOf(checkQuality({ ...good, faceLuminance: NaN }), 'light').ok).toBe(false)
+  })
+
+  it('motion が未指定/NaN だと still が落ちる', () => {
+    expect(keyOf(checkQuality({ ...good, motion: undefined }), 'still').ok).toBe(false)
+    expect(keyOf(checkQuality({ ...good, motion: NaN }), 'still').ok).toBe(false)
+  })
+
+  it('offAxisDeg が負の値で閾値を超えても落ちる', () => {
+    const r = checkQuality({ ...good, offAxisDeg: -40 })
+    expect(r.ok).toBe(false)
+    expect(keyOf(r, 'direction').ok).toBe(false)
+  })
+
+  it('THRESHOLDS は凍結されていて書き換えられない', () => {
+    const before = THRESHOLDS.offAxisDeg
+    expect(() => {
+      THRESHOLDS.offAxisDeg = 999
+    }).toThrow()
+    expect(THRESHOLDS.offAxisDeg).toBe(before)
+  })
+})
