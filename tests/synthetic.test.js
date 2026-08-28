@@ -99,4 +99,24 @@ describe('syntheticDay', () => {
     expect(a.labels.sleepiness).toBe(b.labels.sleepiness)
     expect(a.labels.mood).not.toBe(b.labels.mood)
   })
+
+  it('気分は eyeOpenL/eyeOpenR/underEyeDark などの顔の特徴と無相関である', () => {
+    // 多数の行を生成し、顔の特徴ごとに高い/低いで気分の平均を分割。
+    // 相関があれば高い側と低い側で気分の平均が異なるはず。
+    // 相関がなければ、平均は同程度。
+    const r = makeRng(42)
+    const rows = Array.from({ length: 500 }, () => syntheticDay(r))
+    const avg = (a) => a.reduce((s, v) => s + v, 0) / a.length
+
+    // 複数の顔特徴について、高い/低いで気分の平均を比較
+    const featuresToTest = ['eyeOpenL', 'eyeOpenR', 'underEyeDark']
+    for (const feature of featuresToTest) {
+      const hi = avg(rows.filter((d) => d.z[feature] > 0.5).map((d) => d.labels.mood))
+      const lo = avg(rows.filter((d) => d.z[feature] < -0.5).map((d) => d.labels.mood))
+      const diff = Math.abs(hi - lo)
+      // 相関がなければ、平均差は小さい。実測から判定閾値を設定。
+      // 気分は 1-5 の1-5スケール。無相関なら平均差は 0.5 以下が妥当。
+      expect(diff).toBeLessThan(0.5)
+    }
+  })
 })
