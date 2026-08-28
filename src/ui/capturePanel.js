@@ -40,6 +40,11 @@ export function createCapturePanel({ onShot, shots = 1, title = '撮ります' }
   let stream = null
   let detector = null
   let running = false
+  // start() は createDetector()（初回は wasm/モデル読み込み）と startCamera()（権限プロンプトで
+  // いつ解決するか分からない）の2つの await をまたぐ。その間に stop() が呼ばれることがある
+  // （例: 画面遷移で呼び出し側がこの panel を手放した直後）。stopped はその事実を覚えておき、
+  // 各 await の直後でチェックして、遅れて届いた detector/stream を片付けてループを始めずに抜ける。
+  let stopped = false
   let prevPoints = null
   let greenSince = 0
   let taken = 0
@@ -103,14 +108,26 @@ export function createCapturePanel({ onShot, shots = 1, title = '撮ります' }
   }
 
   async function start() {
+    // すでに stop() 済み（start() が一度も走らないうちに呼ばれた場合を含む）なら、
+    // 何も獲得せずに抜ける。
+    if (stopped) return
     progressEl.textContent = `0 / ${shots} 枚`
     detector = await createDetector()
+    if (stopped) return
     stream = await startCamera(video)
+    if (stopped) {
+      // 待っている間に stop() が呼ばれていた。ループは始めず、いま届いたばかりの
+      // stream をすぐ手放す（でないとカメラのライトが点いたまま誰にも止められなくなる）。
+      stopCamera(stream)
+      stream = null
+      return
+    }
     running = true
     requestAnimationFrame(loop)
   }
 
   function stop() {
+    stopped = true
     running = false
     stopCamera(stream)
     stream = null
