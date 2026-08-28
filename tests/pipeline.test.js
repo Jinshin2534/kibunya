@@ -63,6 +63,10 @@ describe('analyze', () => {
     expect(r.features.underEyeBlue).toBe(0)
     expect(r.features.skinTone).toBe(0)
     expect(r.features.skinRed).toBe(0)
+    // 顔色を採取できていない（faceMean が null）ので、明るさは「良好」で埋めず未測定のまま
+    // 不合格にすべき。ここを合格値で埋める退行が起きたら light も quality.ok も緑になってしまう。
+    expect(r.quality.checks.find((c) => c.key === 'light').ok).toBe(false)
+    expect(r.quality.ok).toBe(false)
   })
 })
 

@@ -26,7 +26,10 @@ export function analyze(landmarks, matrix, image, imageWidth, imageHeight, motio
     rollDeg: frame.rollDeg,
     scalePx: frame.scalePx,
     imageWidth,
-    faceLuminance: colors.faceMean ? luminance(colors.faceMean) : 130,
+    // 顔色を採取できなかった（faceMean が null）場合、それらしい既定値で埋めると
+    // 「測っていない」が合格として扱われてしまう。measured でないなら null をそのまま
+    // 渡し、quality.js の Number.isFinite チェックで不合格にさせる。
+    faceLuminance: colors.faceMean ? luminance(colors.faceMean) : null,
     motion,
   })
   return { frame, colors, features, quality }

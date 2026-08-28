@@ -53,9 +53,19 @@ export function createCapturePanel({ onShot, shots = 1, title = '撮ります' }
   // シャッターの瞬間だけ shotCanvas に原寸で読み直し、特徴量と品質を再計算してから確定する。
   // landmarks/matrix はループの検出結果をそのまま渡す（検出は video を見るだけで縮尺に依存しない）。
   async function shoot(landmarks, matrix, motion) {
-    taken += 1
     const { image, width, height } = grabFrame(video, shotCanvas)
     const r = analyze(landmarks, matrix, image, width, height, motion)
+    // 縮小フレームでゲートが緑でも、実際に記録される原寸フレームが同じ基準を
+    // 満たすとは限らない。記録する当のフレーム自身を再びゲートにかけ、
+    // 不合格ならこの1枚はカウントせずに捨て、カウントダウンだけリセットして
+    // ループを続行する（ユーザーは原寸でも緑になるまで構え直せばよい）。
+    if (!r.quality.ok) {
+      renderChecks(r.quality)
+      greenSince = 0
+      countEl.hidden = true
+      return
+    }
+    taken += 1
     const blob = await makeThumbnail(shotCanvas)
     progressEl.textContent = `${taken} / ${shots} 枚`
     onShot({ features: r.features, quality: r.quality, thumbnailBlob: blob, index: taken })
