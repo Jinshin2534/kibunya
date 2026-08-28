@@ -1,6 +1,7 @@
 import { TARGETS } from '../lib/labels.js'
 import { MIN_ENTRIES, importance, learningCurve } from '../lib/model.js'
 import { growLine } from '../lib/persona.js'
+import { polylinePoints } from '../lib/chartData.js'
 
 /**
  * AI の成績表。当てられていない的は、当てられていないと書く。
@@ -57,8 +58,7 @@ export function renderGrow(root, { entries, trained, baseline }) {
       const curve = learningCurve(entries, t.key, baseline)
       if (curve.length > 1) {
         const w = 300, h = 60
-        const pts = curve.map((p, i) =>
-          `${(i / (curve.length - 1)) * w},${h - p.hitRate * h}`).join(' ')
+        const pts = polylinePoints(curve.map((p) => p.hitRate), curve.length, w, h)
         panel.insertAdjacentHTML('beforeend',
           `<h3>学習曲線</h3>
            <svg viewBox="0 0 ${w} ${h}" class="spark" preserveAspectRatio="none">

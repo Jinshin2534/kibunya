@@ -1,4 +1,5 @@
 import { FEATURE_LABELS_JA } from './features.js'
+import { clampScale } from './labels.js'
 
 export function hashString(s) {
   let h = 2166136261
@@ -28,13 +29,11 @@ const SLEEPINESS = {
   4: 'ちょっと眠そう', 5: 'だいぶ眠そう',
 }
 
-const round = (v) => Math.max(1, Math.min(5, Math.round(v)))
-
 export function speak({ values, confidence, topFeature, seed = '' }) {
   const parts = []
-  if (Number.isFinite(values?.condition)) parts.push(CONDITION[round(values.condition)])
-  if (Number.isFinite(values?.mood)) parts.push(MOOD[round(values.mood)])
-  if (Number.isFinite(values?.sleepiness)) parts.push(SLEEPINESS[round(values.sleepiness)])
+  if (Number.isFinite(values?.condition)) parts.push(CONDITION[clampScale(values.condition)])
+  if (Number.isFinite(values?.mood)) parts.push(MOOD[clampScale(values.mood)])
+  if (Number.isFinite(values?.sleepiness)) parts.push(SLEEPINESS[clampScale(values.sleepiness)])
   const body = parts.length ? parts.join('。') + '。' : '今日はなんとも言えない。'
 
   // 話す中身が無いときに自信満々な出だしを選ぶと、直後の「今日はなんとも言えない。」と

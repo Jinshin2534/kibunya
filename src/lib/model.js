@@ -1,6 +1,6 @@
 import { fitRidge, predictRidge, looPredictions, selectLambda } from './ridge.js'
 import { FEATURE_NAMES, FEATURE_LABELS_JA, toVector } from './features.js'
-import { TARGET_KEYS, SCALE_MIN, SCALE_MAX } from './labels.js'
+import { TARGET_KEYS, clampScale } from './labels.js'
 import { toZ, pooledBaseline } from './baseline.js'
 import { mean } from './stats.js'
 
@@ -83,8 +83,6 @@ export function confidenceOf({ r2, n, z }) {
   return Math.max(0, Math.min(1, dataScore * (0.25 + 0.75 * fitScore) * novelty))
 }
 
-const clampScale = (v) => Math.max(SCALE_MIN, Math.min(SCALE_MAX, v))
-
 /**
  * 的ごとの「使えるか／使えないなら何故か」を出す。predictAll と、
  * predictAll が null を返す（=1つも使える的が無い）場面の両方から使われる。
@@ -116,7 +114,7 @@ export function predictAll(trained, z) {
   for (const key of TARGET_KEYS) {
     const t = trained?.[key]
     if (!t || !t.usable) continue
-    values[key] = clampScale(predictRidge(t.model, x))
+    values[key] = clampScale(predictRidge(t.model, x), false)
     confidences.push(perTarget[key].confidence)
   }
 

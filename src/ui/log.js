@@ -1,5 +1,5 @@
-import { linesSvg, normalize } from './charts.js'
-import { describeCorrelation } from '../lib/chartData.js'
+import { linesSvg } from './charts.js'
+import { normalize, describeCorrelation } from '../lib/chartData.js'
 import { FEATURE_NAMES, FEATURE_LABELS_JA } from '../lib/features.js'
 import { TARGETS } from '../lib/labels.js'
 import { similarDays } from '../lib/neighbors.js'

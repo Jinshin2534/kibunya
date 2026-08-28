@@ -1,4 +1,4 @@
-import { normalize, polylinePoints } from '../lib/chartData.js'
+import { polylinePoints } from '../lib/chartData.js'
 
 /** 0〜1 に正規化済みの系列を重ねて描く折れ線。依存なしの素の SVG。 */
 export function linesSvg({ series, width = 320, height = 90 }) {
@@ -17,7 +17,3 @@ export function linesSvg({ series, width = 320, height = 90 }) {
   return `<svg viewBox="0 0 ${width} ${height}" class="chart" preserveAspectRatio="none">${paths}</svg>
           <div class="legends">${legend}</div>`
 }
-
-// normalize 本体は src/lib/chartData.js（純粋関数・テスト済み）にある。
-// ここでは brief の interface どおり ui/charts.js からも呼べるよう re-export する。
-export { normalize }

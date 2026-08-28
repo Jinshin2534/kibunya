@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { TARGETS, TARGET_KEYS, DEFAULT_TAGS, emptyLabels, normalizeLabels, SCALE_MIN, SCALE_MAX } from '../src/lib/labels.js'
+import { TARGETS, TARGET_KEYS, DEFAULT_TAGS, emptyLabels, normalizeLabels, clampScale, SCALE_MIN, SCALE_MAX } from '../src/lib/labels.js'
 import { dateKey } from '../src/lib/dates.js'
 
 describe('TARGETS', () => {
@@ -22,6 +22,22 @@ describe('TARGETS', () => {
 describe('emptyLabels', () => {
   it('まん中の 3 とタグ無しで始まる', () => {
     expect(emptyLabels()).toEqual({ condition: 3, mood: 3, sleepiness: 3, tags: [] })
+  })
+})
+
+// lib/model.js・lib/synthetic.js・lib/persona.js が別々に持っていた
+// 1〜5クランプをここに集約した共有ヘルパー（Task: 重複クランプの統合）。
+// 丸める／丸めないの両方の挙動を直接ここで固定する。
+describe('clampScale', () => {
+  it('既定（round 省略）は整数に丸めてからクランプする', () => {
+    expect(clampScale(3.5)).toBe(4)
+    expect(clampScale(0)).toBe(SCALE_MIN)
+    expect(clampScale(9)).toBe(SCALE_MAX)
+  })
+  it('round=false は丸めずクランプする（model.js の連続値予測が使う）', () => {
+    expect(clampScale(3.7, false)).toBeCloseTo(3.7, 9)
+    expect(clampScale(0, false)).toBe(SCALE_MIN)
+    expect(clampScale(9, false)).toBe(SCALE_MAX)
   })
 })
 

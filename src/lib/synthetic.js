@@ -1,4 +1,5 @@
 import { FEATURE_NAMES } from './features.js'
+import { clampScale } from './labels.js'
 
 /**
  * 決定的な疑似乱数生成器（線形合同法）。同じ seed からは毎回同じ数列を返す。
@@ -11,8 +12,6 @@ export function makeRng(seed) {
     return s / 4294967296
   }
 }
-
-const clampScale = (v) => Math.max(1, Math.min(5, Math.round(v)))
 
 /**
  * 相関のある合成の1日分（Z 相当の特徴量とラベル）を作る。
