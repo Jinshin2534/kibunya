@@ -45,7 +45,7 @@
 - `@mediapipe/tasks-vision` の FaceLandmarker（478 landmarks + facialTransformationMatrix）
   blendshapes は使わない。特徴量はすべて幾何と色から自分で作る
 - IndexedDB（記録・ベースライン・サムネイル・設定）
-- 開発ポート **5410**
+- 開発ポート **5420**
 
 既存の同系プロジェクト（掌鑑・呼吸法トレーナー・ユビサキ魔法）と同じ流儀に揃える。
 
@@ -63,27 +63,38 @@
 
 ```
 src/
-  lib/          純粋関数だけ。副作用なし。Vitest 対象
-    faceFrame.js   landmarks + 変換行列 → 正規化座標系 と 頭の向き
-    quality.js     撮影品質の判定（向き・大きさ・明るさ・ブレ）
-    features.js    正規化landmarks + 色サンプル → 名前つき特徴量ベクトル
-    baseline.js    複数サンプル → {mean, sd}、Zスコア化
-    ridge.js       閉形式リッジ回帰 fit/predict、λ選択、閉形式LOO
-    model.js       3ターゲット分をまとめる、重要度、自信度、的中率
-    neighbors.js   似ている日の検索（TOP-k）
-    tags.js        タグ別集計（タグあり日 vs なし日の特徴量差）
-    labels.js      ラベルスキーマと既定タグ
-    persona.js     予測+自信度+重み → 気分屋の言い回し（決定的）
-    stats.js       平均/SD/相関/行列演算の小物
+  lib/            純粋関数だけ。副作用なし。Vitest 対象
+    faceFrame.js    landmarks + 変換行列 → 正規化座標系 と 頭の向き
+    landmarks.js    MediaPipe Face Mesh（478点）の canonical インデックス定義
+    sampling.js     ImageData + 座標 → 領域平均RGB・輝度（純粋）
+    faceColors.js   顔のどこを「目の下」「頬」「顔全体」として測るかを決め、平均色を返す
+    quality.js      撮影品質の判定（向き・大きさ・明るさ・ブレ）
+    features.js     正規化landmarks + 色サンプル → 名前つき特徴量ベクトル
+    baseline.js     複数サンプル → {mean, sd}、Zスコア化。記録を混ぜて基準を引き直す pooledBaseline
+    ridge.js        閉形式リッジ回帰 fit/predict、λ選択、閉形式LOO
+    model.js        3ターゲット分の学習・重要度・自信度・的中率・学習曲線
+    neighbors.js    似ている日の検索（TOP-k）
+    tags.js         タグ別集計（タグあり日 vs なし日の特徴量差）
+    labels.js       ラベルスキーマ・既定タグ・1〜5スケールの共有クランプ（clampScale）
+    persona.js      予測+自信度+重み → 気分屋の言い回し（決定的）
+    verdict.js      予測と実際を突き合わせて当たり/はずれを判定、読める的だけ抽出
+    dates.js        ローカル日付キー（YYYY-MM-DD）
+    dump.js         インポートしたJSONの検証・日付順ソート・エラーメッセージ定数
+    chartData.js    折れ線グラフ用の正規化・点列生成・相関の日本語化（純粋な計算部分）
+    thumbnail.js    サムネイルの縮小後サイズを計算（純粋）
+    synthetic.js    カメラ無しで「育ち」「記録」を検証するための決定的な合成データ生成
+    stats.js        平均/SD/相関/行列演算の小物
   face/
-    detector.js    FaceLandmarker のラッパ
-    camera.js      getUserMedia と video 管理
-    sampler.js     canvas から領域平均色/輝度を取る
+    detector.js     FaceLandmarker のラッパ
+    camera.js       getUserMedia と video 管理
+    capture.js      video → canvas → ImageData とサムネイル JPEG
   store/
-    db.js          IndexedDB スキーマとアクセス
+    db.js           IndexedDB スキーマとアクセス
   ui/
+    capturePanel.js  charts.js  labelForm.js  shell.js
     setup.js  today.js  grow.js  log.js  settings.js
-  app.js          配線 + window.__app（ヘッドレス検証用）
+  pipeline.js       landmarks 1枚分 → 顔座標系・色・特徴量・品質をまとめて出す
+  app.js            配線 + window.__app（ヘッドレス検証用）
 ```
 
 **依存の向き**: `ui` → `app` → (`lib`, `face`, `store`)。`lib` は何にも依存しない。

@@ -1,0 +1,127 @@
+import { linesSvg } from './charts.js'
+import { normalize, describeCorrelation } from '../lib/chartData.js'
+import { FEATURE_NAMES, FEATURE_LABELS_JA } from '../lib/features.js'
+import { TARGETS } from '../lib/labels.js'
+import { similarDays } from '../lib/neighbors.js'
+import { tagStats } from '../lib/tags.js'
+import { importance } from '../lib/model.js'
+import { toZ } from '../lib/baseline.js'
+import { getThumb } from '../store/db.js'
+
+export function renderLog(root, { entries, trained, baseline }) {
+  root.innerHTML = `<h1>記録</h1><p class="note">${entries.length} 件</p>`
+  if (!entries.length) {
+    root.insertAdjacentHTML('beforeend', '<div class="panel"><p class="note">まだ記録がありません。</p></div>')
+    return
+  }
+
+  // 保存されている z は「撮ったその日の基準」で測った値なので、日によって物差しが違う。
+  // 画面に出す前に、いまの基準で全部を測り直す（学習が designOf でしているのと同じこと）。
+  const scaled = entries.map((e) => ({ ...e, z: toZ(e.features, baseline) }))
+
+  // ── 顔の特徴量 と 自己申告 の重ね合わせ ─────────────────
+  const chart = document.createElement('div')
+  chart.className = 'panel'
+  const defaultFeature = importance(trained.condition?.model)[0]?.feature ?? FEATURE_NAMES[0]
+  chart.innerHTML = `
+    <h2>顔と実感を重ねる</h2>
+    <div class="pickers">
+      <select class="pick-feature">${FEATURE_NAMES.map((n) =>
+        `<option value="${n}" ${n === defaultFeature ? 'selected' : ''}>${FEATURE_LABELS_JA[n]}</option>`).join('')}</select>
+      <select class="pick-target">${TARGETS.map((t) =>
+        `<option value="${t.key}">${t.label}</option>`).join('')}</select>
+    </div>
+    <div class="chart-slot"></div>
+    <p class="line corr-slot"></p>
+    <p class="note">グラフは2本をそれぞれの最小〜最大に引き伸ばして重ねています。
+    形が似ていても関係があるとは限らないので、実際の相関を上に出しています。</p>
+  `
+  root.append(chart)
+
+  const slot = chart.querySelector('.chart-slot')
+  const corrSlot = chart.querySelector('.corr-slot')
+  const drawChart = () => {
+    const f = chart.querySelector('.pick-feature').value
+    const t = chart.querySelector('.pick-target').value
+    // 重ね描き用の折れ線は、アプリが書いた記録では起きない欠損を 0／3 で
+    // 埋めて連続な線を保つ（見た目だけの重ね合わせなので、そのまま）。
+    const rawA = scaled.map((e) => e.z?.[f] ?? 0)
+    const rawB = scaled.map((e) => e.labels?.[t] ?? 3)
+    slot.innerHTML = linesSvg({
+      series: [
+        { values: normalize(rawA), color: 'var(--accent)', label: FEATURE_LABELS_JA[f] },
+        { values: normalize(rawB), color: 'var(--ok)', label: TARGETS.find((x) => x.key === t).label },
+      ],
+    })
+    // 相関は「実際にその両方の値がある」組だけで計算する。無ければ 0・3 に
+    // 倒して混ぜると、埋めた値そのものが相関を歪めてしまう（このブランチが
+    // 他の場所ではやめた「無ければ捏造する」パターン）。アプリ自身が書いた
+    // 記録では z も labels も欠けないが、インポートしたダンプには欠損があり得る。
+    const pairs = scaled
+      .map((e) => [e.z?.[f], e.labels?.[t]])
+      .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b))
+    const skipped = scaled.length - pairs.length
+    const corr = describeCorrelation(pairs.map(([a]) => a), pairs.map(([, b]) => b))
+    corrSlot.textContent = corr.text + (skipped
+      ? `（値が欠けている ${skipped} 件は相関の計算から除外）` : '')
+  }
+  chart.querySelector('.pick-feature').onchange = drawChart
+  chart.querySelector('.pick-target').onchange = drawChart
+  drawChart()
+
+  // ── 似ている日 ──────────────────────────────────────
+  const latest = scaled[scaled.length - 1]
+  const near = similarDays(latest.z, scaled, 3, latest.date)
+  if (near.length) {
+    root.insertAdjacentHTML('beforeend', `<div class="panel">
+      <h2>最後に撮った顔に似ている日</h2>
+      ${near.map(({ entry, distance }) => `<div class="row">
+        <span>${entry.date}</span>
+        <b>体調 ${entry.labels?.condition ?? '—'}</b>
+        <small>${(entry.labels?.tags ?? []).join('・') || 'タグなし'} / 距離 ${distance.toFixed(2)}</small>
+      </div>`).join('')}
+    </div>`)
+  }
+
+  // ── タグ別の傾向 ────────────────────────────────────
+  const tags = tagStats(scaled, 3)
+  if (tags.length) {
+    root.insertAdjacentHTML('beforeend', `<div class="panel">
+      <h2>タグが付いた日の顔</h2>
+      ${tags.map((t) => `<h3>${t.tag}（${t.count} 日）</h3>` + t.features.map((f) =>
+        `<div class="row"><span>${f.label}</span>
+         <b>${f.delta >= 0 ? '＋' : '−'}${Math.abs(f.delta).toFixed(2)}σ</b></div>`).join('')).join('')}
+      <p class="note">タグが付いた日と付かなかった日の差です。原因ではなく、一緒に起きていたことの要約。</p>
+    </div>`)
+  }
+
+  // ── 一覧（サムネイル付き）───────────────────────────
+  const list = document.createElement('div')
+  list.className = 'panel'
+  list.innerHTML = '<h2>ぜんぶの記録</h2>'
+  const grid = document.createElement('div')
+  grid.className = 'thumbgrid'
+  list.append(grid)
+  root.append(list)
+
+  for (const e of [...entries].reverse()) {
+    const cell = document.createElement('div')
+    cell.className = 'thumb'
+    cell.innerHTML = `<div class="ph"></div>
+      <small>${e.date.slice(5)}</small>
+      <b>体調 ${e.labels?.condition ?? '—'}</b>`
+    grid.append(cell)
+    getThumb(e.date).then((t) => {
+      if (!t?.blob) return
+      const img = document.createElement('img')
+      img.src = URL.createObjectURL(t.blob)
+      img.alt = `${e.date} の顔`
+      // 読み込めても読み込めなくても、いずれかで必ず revoke する。
+      // onload だけだと、壊れた画像データのときに Object URL が
+      // このタブが生きている間ずっと残ってしまう。
+      img.onload = () => URL.revokeObjectURL(img.src)
+      img.onerror = () => URL.revokeObjectURL(img.src)
+      cell.querySelector('.ph').replaceWith(img)
+    })
+  }
+}

@@ -1,0 +1,246 @@
+import { renderShell } from './ui/shell.js'
+import { renderSetup } from './ui/setup.js'
+import { renderToday } from './ui/today.js'
+import { renderGrow } from './ui/grow.js'
+import { renderLog } from './ui/log.js'
+import { renderSettings } from './ui/settings.js'
+import { analyze } from './pipeline.js'
+import { buildBaseline, toZ, pooledBaseline } from './lib/baseline.js'
+import { dateKey } from './lib/dates.js'
+import { trainAll, predictAll, perTargetOf, importance } from './lib/model.js'
+import { speak } from './lib/persona.js'
+import { FEATURE_NAMES } from './lib/features.js'
+import { makeRng, syntheticDay } from './lib/synthetic.js'
+import { parseDumpJson, PARSE_JSON_ERROR } from './lib/dump.js'
+import * as db from './store/db.js'
+
+const root = document.querySelector('#app')
+
+const TABS = [
+  { key: 'today', label: '今日' },
+  { key: 'grow', label: '育ち' },
+  { key: 'log', label: '記録' },
+  { key: 'settings', label: '設定' },
+]
+
+const state = { baseline: null, entries: [], trained: {}, tab: 'today', lastAnalysis: null, settings: null, thumbCount: 0 }
+
+// renderToday が撮影中のカメラを掴んでいるとき、離脱時に確実に止めるためのハンドル。
+// 同じ画面を再描画するときも先に呼ぶ（前の撮影が生き残ったまま新しい撮影を
+// 二重に始めないように）。
+let activeScreen = null
+
+async function load() {
+  state.baseline = await db.getBaseline()
+  state.entries = await db.allEntries()
+  state.settings = await db.getSettings()
+  state.thumbCount = await db.thumbCount()
+  // 学習の X も、セットアップの 5 枚だけでなくこれまでの記録を混ぜ直した
+  // 基準（Task 7 の pooledBaseline）で Z 化する。保存済みの entry.z は撮影時点の
+  // 基準に固定されているので、基準が引き直されるたびに古い Z のまま学習することになる。
+  const scale = pooledBaseline(state.baseline, state.entries)
+  state.trained = trainAll(state.entries, scale)
+}
+
+function predictFor(features, now = new Date()) {
+  const today = dateKey(now)
+  // 今日の記録を含めたまま学習すると、今日の答えを見たモデルが今日を予測することになる。
+  // それで「当たり」と言うのは自分のテスト答案を採点しているのと同じなので、今日は外す。
+  const past = state.entries.filter((e) => e.date !== today)
+  const scale = pooledBaseline(state.baseline, past)
+  const trained = trainAll(past, scale)
+  const z = toZ(features, scale)
+  const p = predictAll(trained, z)
+  if (!p) {
+    // 使える的が1つも無い。それでも perTarget（的ごとの reason）は返す。
+    // today.js はここを見て「記録がまだ足りない」のか「これだけ記録があっても
+    // 顔からは読み取れない」のかを言い分ける（前者は待てば変わるかもしれない
+    // が、後者を「記録がたまれば」と言うのは届かないかもしれない期待を持たせる嘘になる）。
+    return { values: {}, confidence: 0, perTarget: perTargetOf(trained, z), line: null }
+  }
+  const usableKey = Object.keys(p.values)[0]
+  const top = usableKey ? importance(trained[usableKey].model)[0] : null
+  return {
+    values: p.values, // 読めた的だけ。既定値で埋めない
+    confidence: p.confidence,
+    perTarget: p.perTarget,
+    line: speak({
+      values: p.values,
+      confidence: p.confidence,
+      topFeature: top?.feature ?? null,
+      seed: dateKey(new Date()),
+    }),
+  }
+}
+
+function render() {
+  // 画面を描き直す前に、前の画面が撮影中カメラを持っていたら必ず止める。
+  // タブを切り替えたとき・同じタブを再描画したときの両方でここを通る。
+  activeScreen?.stop?.()
+  activeScreen = null
+
+  if (!state.baseline) {
+    document.querySelector('#tabbar').innerHTML = ''
+    // renderSetup も renderToday と同じ形で stop() を返す。ここは初回のオンボーディング
+    // だけでなく、設定画面の「撮り直す」で state.baseline を null に戻して再入場する
+    // 経路も通るため、離脱時にカメラを止められるよう activeScreen に必ず入れる。
+    activeScreen = renderSetup(root, {
+      onDone: async (b) => { await db.setBaseline(b); await load(); render() },
+    }) ?? null
+    return
+  }
+  renderShell({ tabs: TABS, current: state.tab, onSelect: (k) => { state.tab = k; render() } })
+
+  if (state.tab === 'today') {
+    const today = state.entries.find((e) => e.date === dateKey(new Date())) ?? null
+    // セットアップの 5 枚だけでなく、これまでの記録も混ぜた基準で Z 化する
+    // （Task 7）。そうしないと平均が 0 付近の特徴量が毎日クランプに張り付く。
+    const scale = pooledBaseline(state.baseline, state.entries)
+    activeScreen = renderToday(root, {
+      baseline: scale,
+      todayEntry: today,
+      predictFor,
+      onSaved: async () => {
+        // 保存のあと、記録が増えて動いた基準で学習し直す。
+        state.entries = await db.allEntries()
+        const scale = pooledBaseline(state.baseline, state.entries)
+        state.trained = trainAll(state.entries, scale)
+      },
+    }) ?? null
+    return
+  }
+
+  if (state.tab === 'grow') {
+    // baseline は state.baseline（セットアップ時点の生の基準）をそのまま渡す。
+    // renderGrow 内の学習曲線（learningCurve）は先読みを避けるため、
+    // 表示時点までの記録だけでこの基準を毎回プールし直す（lib/model.js）。
+    renderGrow(root, { entries: state.entries, trained: state.trained, baseline: state.baseline })
+    return
+  }
+
+  if (state.tab === 'log') {
+    const scale = pooledBaseline(state.baseline, state.entries)
+    renderLog(root, { entries: state.entries, trained: state.trained, baseline: scale })
+    return
+  }
+
+  if (state.tab === 'settings') {
+    renderSettings(root, {
+      settings: state.settings, entries: state.entries, baseline: state.baseline, thumbCount: state.thumbCount,
+      actions: {
+        onClearAll: async () => {
+          // clearAll は baseline/entries/thumbs/settings の4ストア全てを1つの
+          // トランザクションで消す（store/db.js）。消した直後は state.baseline が
+          // null になるので、render() の先頭の分岐がそのままセットアップ画面へ導く。
+          await db.clearAll()
+          await load()
+          state.tab = 'today'
+          render()
+        },
+        onToggleThumbnails: async (on) => {
+          await db.setSettings({ keepThumbnails: on })
+          await load()
+          render()
+        },
+        onRebuildBaseline: () => {
+          // state.baseline を null にするだけで、render() の先頭の分岐が
+          // セットアップ画面（撮影パネル）を出す。撮り終えて「はじめる」を押すと
+          // onDone が新しい基準を保存し、この設定画面（state.tab は変わっていない）
+          // に戻ってくる。
+          state.baseline = null
+          render()
+        },
+        onExport: async () => {
+          // 書き出しは写真（thumbs）を含めない: base64 化すると JSON が肥大化するため。
+          const dump = await db.exportAll()
+          const url = URL.createObjectURL(new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' }))
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `kibunya-${dateKey(new Date())}.json`
+          // download 開始（クリック）のあとで revoke する。先に revoke すると
+          // まだ開始していないダウンロードが失敗することがある。
+          a.click()
+          URL.revokeObjectURL(url)
+        },
+        onImport: async (file) => {
+          // JSON として壊れている場合は parseDumpJson が PARSE_JSON_ERROR（lib/dump.js）で投げる。
+          // 形は正しくても中身が不正な場合は db.importAll 側の isValidDump が
+          // INVALID_DUMP_ERROR（store/db.js）を投げる。どちらも err.message が
+          // そのまま日本語の文になっているので、alert にそのまま出せる。
+          // それ以外（IndexedDB の書き込み失敗など）は err.message が英語や
+          // 実装依存の文言になり得るので、生では出さず定型文にする。
+          // 定数を throw 側からインポートして比較するのは、メッセージ文言を
+          // どちらかだけ変えたときに、この判定がこっそり定型文（フォールバック）へ
+          // 落ちてしまう（＝せっかくの詳しいエラーが握りつぶされる）事故を防ぐため。
+          const KNOWN_IMPORT_ERRORS = new Set([PARSE_JSON_ERROR, db.INVALID_DUMP_ERROR])
+          try {
+            const dump = parseDumpJson(await file.text())
+            await db.importAll(dump)
+            await load()
+            state.tab = 'log'
+            render()
+          } catch (err) {
+            const message = KNOWN_IMPORT_ERRORS.has(err.message) ? err.message : '読み込み中に問題が発生しました'
+            alert(`読み込めませんでした: ${message}`)
+          }
+        },
+      },
+    })
+    return
+  }
+
+  // ここには来ない: state.tab は TABS のキー（'today'|'grow'|'log'|'settings'）
+  // からしか代入されず、その4つは全てこの上で return している。
+}
+
+await load()
+render()
+
+window.__app = {
+  // matrix を省略して呼ぶと、offAxisDeg(null) が null（未測定）を返すため、
+  // quality.checks の direction は必ず不合格になる。これは正しい挙動 —
+  // 顔の向きを測っていないのに「正面だった」ことにしてゲートを通すのは事故のもと。
+  // 向きのチェックまで含めて緑にしたいテスト・検証では matrix を渡すこと。
+  feedLandmarks(landmarks, { matrix = null, image = null, width = 640, height = 480 } = {}) {
+    const r = analyze(landmarks, matrix, image, width, height, 0)
+    state.lastAnalysis = r
+    return r
+  },
+  async setBaselineFrom(featureList) {
+    const b = buildBaseline(featureList)
+    await db.setBaseline(b)
+    state.baseline = b
+    render()
+    return b
+  },
+  zOfLast() { return toZ(state.lastAnalysis?.features, pooledBaseline(state.baseline, state.entries)) },
+  getState() { return state },
+  async reload() { await load(); render() },
+  async reset() { await db.clearAll(); await load(); render() },
+
+  // カメラ無しで「育ち」「記録」を検証するための合成データ。
+  // 相関のある値そのもの（決定的乱数・体調/眠さ/気分の式）は src/lib/synthetic.js
+  // の純粋関数に持たせてあり、ここは日付を振って DB に書き込む I/O だけを担う。
+  async seedDays(n = 40) {
+    const rnd = makeRng(12345)
+    const base = new Date()
+    for (let i = 0; i < n; i++) {
+      const { z, labels } = syntheticDay(rnd)
+      const d = new Date(base.getTime())
+      d.setDate(d.getDate() - (n - 1 - i))
+      await db.putEntry({
+        date: dateKey(d), capturedAt: d.getTime(),
+        features: z, z, quality: { ok: true, checks: [] },
+        labels,
+        prediction: null,
+      })
+    }
+    if (!state.baseline) {
+      await db.setBaseline({ mean: Object.fromEntries(FEATURE_NAMES.map((k) => [k, 0])),
+                             sd: Object.fromEntries(FEATURE_NAMES.map((k) => [k, 1])),
+                             sampleCount: n, values: [] })
+    }
+    await this.reload()
+    return state.entries.length
+  },
+}

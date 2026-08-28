@@ -1,0 +1,44 @@
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * parseDumpJson が投げるエラーメッセージ。app.js の import ハンドラは
+ * これを err.message と文字列の直接比較で判定しているので、ここを編集したら
+ * リテラルのコピーではなくこの定数を使っているか（src/app.js）を確認すること。
+ */
+export const PARSE_JSON_ERROR = 'JSON として読み取れないファイルです'
+
+function isPlainObject(v) {
+  return typeof v === 'object' && v !== null && !Array.isArray(v)
+}
+
+/** 読み込んだダンプが store/db.importAll に安全に渡せる形かを検証する。 */
+export function isValidDump(dump) {
+  if (!isPlainObject(dump)) return false
+  if (!Array.isArray(dump.entries)) return false
+  if (!dump.entries.every((e) => isPlainObject(e) && typeof e.date === 'string' && DATE_RE.test(e.date))) {
+    return false
+  }
+  if (dump.baseline != null && !isPlainObject(dump.baseline)) return false
+  if (dump.settings != null && !isPlainObject(dump.settings)) return false
+  return true
+}
+
+/** date 文字列の昇順に並べた新しい配列を返す（引数は変更しない）。 */
+export function sortByDate(rows) {
+  return [...rows].sort((a, b) => a.date.localeCompare(b.date))
+}
+
+/**
+ * インポートしたファイルの中身を読む。
+ * JSON.parse がそのまま投げるエラーは "Unexpected token..." のような英語の
+ * 構文エラーで、そのまま画面に出しても何が起きたか伝わらない。
+ * ここで日本語の一文に変換しておき、呼び出し側（app.js）はそのまま
+ * alert に出せるようにする。
+ */
+export function parseDumpJson(text) {
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new Error(PARSE_JSON_ERROR)
+  }
+}
