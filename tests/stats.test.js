@@ -49,6 +49,9 @@ describe('inverse', () => {
     expect(I[1][0]).toBeCloseTo(0, 9)
     expect(I[1][1]).toBeCloseTo(1, 9)
   })
+  it('特異行列は null', () => {
+    expect(inverse([[1, 2], [2, 4]])).toBeNull()
+  })
 })
 
 describe('pearson', () => {
