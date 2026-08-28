@@ -34,6 +34,16 @@ describe('extractFeatures', () => {
     for (const n of FEATURE_NAMES) expect(b[n]).toBeCloseTo(a[n], 6)
   })
 
+  it('★色の不変性: 部屋の明るさが変わっても色の特徴量は変わらない', () => {
+    const scale = (c, k) => ({ r: c.r * k, g: c.g * k, b: c.b * k })
+    const dim = Object.fromEntries(Object.entries(COLORS).map(([k, v]) => [k, scale(v, 0.45)]))
+    const a = featuresOf(makeFace(), COLORS)
+    const b = featuresOf(makeFace(), dim)
+    for (const n of ['underEyeDark', 'underEyeBlue', 'skinTone', 'skinRed']) {
+      expect(b[n]).toBeCloseTo(a[n], 6)
+    }
+  })
+
   it('目を大きく開けると eyeOpen が増える', () => {
     const narrow = featuresOf(makeFace())
     const wide = featuresOf(makeFace({
@@ -43,11 +53,26 @@ describe('extractFeatures', () => {
     expect(wide.eyeOpenR).toBeGreaterThan(narrow.eyeOpenR)
   })
 
+  it('左目を大きく開けると eyeOpenL が増える', () => {
+    const narrow = featuresOf(makeFace())
+    const wide = featuresOf(makeFace({
+      [IDX.eyeUpperL]: { x: 0.57, y: 0.36, z: 0 },
+      [IDX.eyeLowerL]: { x: 0.57, y: 0.44, z: 0 },
+    }))
+    expect(wide.eyeOpenL).toBeGreaterThan(narrow.eyeOpenL)
+  })
+
   it('左右で開き方が違うと eyeOpenAsym が 0 から離れる', () => {
     const even = featuresOf(makeFace())
     const uneven = featuresOf(makeFace({ [IDX.eyeUpperL]: { x: 0.57, y: 0.355, z: 0 } }))
     expect(Math.abs(even.eyeOpenAsym)).toBeLessThan(1e-9)
     expect(Math.abs(uneven.eyeOpenAsym)).toBeGreaterThan(0.05)
+  })
+
+  it('まぶたが下がる（上まぶたが眉から離れる）と lidHeavy が増える', () => {
+    const base = featuresOf(makeFace())
+    const droopy = featuresOf(makeFace({ [IDX.eyeUpperR]: { x: 0.43, y: 0.39, z: 0 } }))
+    expect(droopy.lidHeavy).toBeGreaterThan(base.lidHeavy)
   })
 
   it('口角が上がると mouthCornerLift が正になる', () => {
@@ -69,10 +94,65 @@ describe('extractFeatures', () => {
     expect(puffy.faceWidthLower).toBeGreaterThan(base.faceWidthLower)
   })
 
+  it('頬が中心線から離れると cheekFullness が増える', () => {
+    const base = featuresOf(makeFace())
+    const full = featuresOf(makeFace({
+      [IDX.cheekL]: { x: 0.62, y: 0.55, z: 0 },
+      [IDX.cheekR]: { x: 0.38, y: 0.55, z: 0 },
+    }))
+    expect(full.cheekFullness).toBeGreaterThan(base.cheekFullness)
+  })
+
+  it('jawSharp はデフォルトで正の値を持ち、顎が細くなるほど増える（鋭くなる）', () => {
+    const base = featuresOf(makeFace())
+    expect(base.jawSharp).toBeGreaterThan(0)
+    const narrow = featuresOf(makeFace({
+      [IDX.jawL]: { x: 0.55, y: 0.68, z: 0 },
+      [IDX.jawR]: { x: 0.45, y: 0.68, z: 0 },
+    }))
+    expect(narrow.jawSharp).toBeGreaterThan(base.jawSharp)
+  })
+
+  it('眉が上がると browHeight が増える', () => {
+    const base = featuresOf(makeFace())
+    const raised = featuresOf(makeFace({
+      [IDX.browTopL]: { x: 0.57, y: 0.30, z: 0 },
+      [IDX.browTopR]: { x: 0.43, y: 0.30, z: 0 },
+    }))
+    expect(raised.browHeight).toBeGreaterThan(base.browHeight)
+  })
+
+  it('眉間が狭くなる（眉頭が近づく）と browFurrow が増える', () => {
+    const base = featuresOf(makeFace())
+    const narrow = featuresOf(makeFace({
+      [IDX.browInnerL]: { x: 0.51, y: 0.35, z: 0 },
+      [IDX.browInnerR]: { x: 0.49, y: 0.35, z: 0 },
+    }))
+    expect(narrow.browFurrow).toBeGreaterThan(base.browFurrow)
+  })
+
   it('目の下が暗いほど underEyeDark が大きい', () => {
     const light = featuresOf(makeFace(), { ...COLORS, underEyeL: { r: 175, g: 148, b: 138 }, underEyeR: { r: 175, g: 148, b: 138 } })
     const dark = featuresOf(makeFace(), { ...COLORS, underEyeL: { r: 90, g: 70, b: 80 }, underEyeR: { r: 90, g: 70, b: 80 } })
     expect(dark.underEyeDark).toBeGreaterThan(light.underEyeDark)
+  })
+
+  it('頬が顔全体の平均より明るいほど skinTone が大きい', () => {
+    const base = featuresOf(makeFace())
+    const bright = featuresOf(makeFace(), { ...COLORS, cheekL: { r: 220, g: 190, b: 180 }, cheekR: { r: 220, g: 190, b: 180 } })
+    expect(bright.skinTone).toBeGreaterThan(base.skinTone)
+  })
+
+  it('頬の色に占める赤みの割合が大きいほど skinRed が大きい', () => {
+    const base = featuresOf(makeFace())
+    const red = featuresOf(makeFace(), { ...COLORS, cheekL: { r: 200, g: 130, b: 120 }, cheekR: { r: 200, g: 130, b: 120 } })
+    expect(red.skinRed).toBeGreaterThan(base.skinRed)
+  })
+
+  it('目の下が頬より青みがかっているほど underEyeBlue が大きい', () => {
+    const base = featuresOf(makeFace())
+    const blue = featuresOf(makeFace(), { ...COLORS, underEyeL: { r: 100, g: 100, b: 160 }, underEyeR: { r: 100, g: 100, b: 160 } })
+    expect(blue.underEyeBlue).toBeGreaterThan(base.underEyeBlue)
   })
 
   it('色サンプルが無ければ色由来の特徴量は 0', () => {
@@ -97,17 +177,23 @@ describe('extractFeatures', () => {
     expect(featuresOf(sym).asymmetry).toBeCloseTo(0, 9)
   })
 
+  it('鏡映対の点が大きくずれると asymmetry がほぼ対称なデフォルト顔よりはっきり大きくなる', () => {
+    const base = featuresOf(makeFace())
+    const displaced = featuresOf(makeFace({ [IDX.jawL]: { x: 0.75, y: 0.68, z: 0 } }))
+    expect(displaced.asymmetry).toBeGreaterThan(base.asymmetry + 0.05)
+  })
+
   it('目頭と目尻が重なると eyeOpenR は0（ゼロ割ガード）', () => {
     const f = featuresOf(makeFace({ [IDX.eyeOuterR]: { x: 0.45, y: 0.40, z: 0 } }))
     expect(f.eyeOpenR).toBe(0)
     expect(Number.isFinite(f.eyeOpenR)).toBe(true)
   })
 
-  it('顎の点が顎先と重なると jawSharp は0（角度計算の退化ベクトルガード）', () => {
+  it('顎の点が顎先と重なると jawSharp は180（角度計算の退化ベクトルガード、180度反転後の値）', () => {
     const rEqualsChin = featuresOf(makeFace({ [IDX.jawR]: { x: 0.50, y: 0.76, z: 0 } }))
     const lEqualsChin = featuresOf(makeFace({ [IDX.jawL]: { x: 0.50, y: 0.76, z: 0 } }))
-    expect(rEqualsChin.jawSharp).toBe(0)
-    expect(lEqualsChin.jawSharp).toBe(0)
+    expect(rEqualsChin.jawSharp).toBe(180)
+    expect(lEqualsChin.jawSharp).toBe(180)
   })
 
   it('underEyeL が null でも underEyeR だけで計算する（meanColor の片側 null 分岐）', () => {
