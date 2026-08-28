@@ -76,3 +76,13 @@ b.miss { color: var(--ng); }
 h3 { font-size: 13px; color: var(--muted); margin: 18px 0 6px; font-weight: 600; }
 .meter span.wide { width: 9em; }
 .spark { width: 100%; height: 60px; display: block; }
+.pickers { display: flex; gap: 8px; margin-bottom: 10px; }
+.pickers select { flex: 1; padding: 8px; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+.chart { width: 100%; height: 90px; display: block; }
+.legends { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+.legend i { display: inline-block; width: 10px; height: 3px; margin-right: 5px; vertical-align: middle; }
+.thumbgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px; }
+.thumb { text-align: center; font-size: 11px; }
+.thumb img, .thumb .ph { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; background: var(--line); display: block; transform: scaleX(-1); }
+.thumb small { color: var(--muted); display: block; }
+.thumb b { font-size: 11px; }

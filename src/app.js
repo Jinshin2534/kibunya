@@ -2,6 +2,7 @@ import { renderShell } from './ui/shell.js'
 import { renderSetup } from './ui/setup.js'
 import { renderToday } from './ui/today.js'
 import { renderGrow } from './ui/grow.js'
+import { renderLog } from './ui/log.js'
 import { analyze } from './pipeline.js'
 import { buildBaseline, toZ, pooledBaseline } from './lib/baseline.js'
 import { dateKey } from './lib/dates.js'
@@ -92,6 +93,11 @@ function render() {
   if (state.tab === 'grow') {
     const scale = pooledBaseline(state.baseline, state.entries)
     renderGrow(root, { entries: state.entries, trained: state.trained, baseline: scale })
+    return
+  }
+
+  if (state.tab === 'log') {
+    renderLog(root, { entries: state.entries, trained: state.trained })
     return
   }
 
