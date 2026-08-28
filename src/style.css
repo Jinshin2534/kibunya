@@ -73,3 +73,6 @@ button:disabled { opacity: .45; cursor: default; }
 .meter b { width: 2.4em; text-align: right; font-variant-numeric: tabular-nums; }
 b.hit { color: var(--ok); }
 b.miss { color: var(--ng); }
+h3 { font-size: 13px; color: var(--muted); margin: 18px 0 6px; font-weight: 600; }
+.meter span.wide { width: 9em; }
+.spark { width: 100%; height: 60px; display: block; }
