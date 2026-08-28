@@ -39,7 +39,10 @@ export function renderToday(root, { baseline, todayEntry, onSaved, predictFor, n
 
   function showResult(features, quality, thumbnailBlob) {
     const z = toZ(features, baseline)
-    const prediction = predictFor ? predictFor(z) : null
+    // predictFor には z ではなく生の features を渡す。predictFor 自身が
+    // 今日を除いた記録＋そのプールされた基準で Z 化し直す（app.js 側）ので、
+    // ここで baseline（今日を含む基準）で作った z を渡すと Z の物差しがずれる。
+    const prediction = predictFor ? predictFor(features) : null
 
     root.innerHTML = `<h1>今日</h1><p class="note">${date}</p>`
     const guess = document.createElement('div')

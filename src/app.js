@@ -42,11 +42,18 @@ async function load() {
   state.trained = trainAll(state.entries, scale)
 }
 
-function predictFor(z) {
-  const p = predictAll(state.trained, z)
+function predictFor(features, now = new Date()) {
+  const today = dateKey(now)
+  // 今日の記録を含めたまま学習すると、今日の答えを見たモデルが今日を予測することになる。
+  // それで「当たり」と言うのは自分のテスト答案を採点しているのと同じなので、今日は外す。
+  const past = state.entries.filter((e) => e.date !== today)
+  const scale = pooledBaseline(state.baseline, past)
+  const trained = trainAll(past, scale)
+  const z = toZ(features, scale)
+  const p = predictAll(trained, z)
   if (!p) return null
   const usableKey = Object.keys(p.values)[0]
-  const top = usableKey ? importance(state.trained[usableKey].model)[0] : null
+  const top = usableKey ? importance(trained[usableKey].model)[0] : null
   return {
     values: p.values, // 読めた的だけ。既定値で埋めない
     confidence: p.confidence,
