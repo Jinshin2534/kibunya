@@ -79,14 +79,14 @@ describe('追加ガード: num() の非有限値処理', () => {
 })
 
 describe('追加ガード: ベースラインのキーが不足したケース', () => {
-  it('baseline.mean に特徴量キーがない場合', () => {
-    const incomplete = { mean: {}, sd: { eyeOpenL: 1 }, sampleCount: 1 }
+  it('baseline.mean に特徴量キーがない場合でも sampleCount >= 2 なら全部 0 にならない', () => {
+    const incomplete = { mean: {}, sd: { eyeOpenL: 1 }, sampleCount: 2 }
     const z = toZ(sample(5), incomplete)
     // num(undefined) = 0 なので (5 - 0) / sdFloor(1, 0) = 5 / 1 = 5
     expect(z.eyeOpenL).toBeCloseTo(5, 9)
   })
-  it('baseline.sd に特徴量キーがない場合', () => {
-    const incomplete = { mean: { eyeOpenL: 3 }, sd: {}, sampleCount: 1 }
+  it('baseline.sd に特徴量キーがない場合でも sampleCount >= 2 なら全部 0 にならない', () => {
+    const incomplete = { mean: { eyeOpenL: 3 }, sd: {}, sampleCount: 2 }
     const z = toZ(sample(5), incomplete)
     // num(undefined) = 0 なので sdFloor(0, 3) = 0.15 → (5-3)/0.15 ≈ 13.3 → ±Z_CLAMP にクランプ
     expect(z.eyeOpenL).toBe(Z_CLAMP)
@@ -110,7 +110,7 @@ describe('追加ガード: toZ が baseline.mean / baseline.sd 丸ごと欠落�
   // baseline.sd[n] / baseline.mean[n] への非オプショナルなアクセスで
   // TypeError: Cannot read properties of undefined を投げていた。
   it('sd キー自体が無いベースラインでも全部 0', () => {
-    const z = toZ(sample(0), { mean: { eyeOpenL: 0 }, sampleCount: 1 })
+    const z = toZ(sample(5), { mean: { eyeOpenL: 0 }, sampleCount: 1 })
     for (const n of FEATURE_NAMES) expect(z[n]).toBe(0)
   })
   it('mean キー自体が無いベースラインでも全部 0', () => {
@@ -121,6 +121,17 @@ describe('追加ガード: toZ が baseline.mean / baseline.sd 丸ごと欠落�
     expect(() => toZ(sample(0), { sampleCount: 1 })).not.toThrow()
     const z = toZ(sample(0), { sampleCount: 1 })
     for (const n of FEATURE_NAMES) expect(z[n]).toBe(0)
+  })
+  it('1 サンプルからの基準は広がりを表現できないので全部 0', () => {
+    const single = buildBaseline([sample(1)])
+    const z = toZ(sample(100), single)
+    for (const n of FEATURE_NAMES) expect(z[n]).toBe(0)
+  })
+  it('2 サンプル以上の基準は外れ値を Z スコアで区別できる', () => {
+    const dual = buildBaseline([sample(1), sample(3)])
+    const z = toZ(sample(100), dual)
+    expect(z.eyeOpenL).toBe(Z_CLAMP)
+    for (const n of FEATURE_NAMES) expect(z[n]).not.toBe(0)
   })
 })
 

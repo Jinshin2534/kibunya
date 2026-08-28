@@ -28,8 +28,20 @@ export function buildBaseline(samples) {
 
 export function toZ(features, baseline) {
   const out = {}
+
+  // 基準が使えない場合は全て 0 を返す。
+  // unknown は無限大ではなく 0 として解釈する必要がある。
+  if (
+    !baseline ||
+    !baseline.mean || typeof baseline.mean !== 'object' ||
+    !baseline.sd || typeof baseline.sd !== 'object' ||
+    !Number.isFinite(baseline.sampleCount) || baseline.sampleCount < 2
+  ) {
+    for (const n of FEATURE_NAMES) out[n] = 0
+    return out
+  }
+
   for (const n of FEATURE_NAMES) {
-    if (!baseline) { out[n] = 0; continue }
     const s = sdFloor(num(baseline.sd?.[n]), num(baseline.mean?.[n]))
     const z = (num(features?.[n]) - num(baseline.mean?.[n])) / s
     out[n] = Math.max(-Z_CLAMP, Math.min(Z_CLAMP, z))
