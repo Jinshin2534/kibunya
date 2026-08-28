@@ -45,7 +45,7 @@
 - `@mediapipe/tasks-vision` の FaceLandmarker（478 landmarks + facialTransformationMatrix）
   blendshapes は使わない。特徴量はすべて幾何と色から自分で作る
 - IndexedDB（記録・ベースライン・サムネイル・設定）
-- 開発ポート **5410**
+- 開発ポート **5420**
 
 既存の同系プロジェクト（掌鑑・呼吸法トレーナー・ユビサキ魔法）と同じ流儀に揃える。
 
