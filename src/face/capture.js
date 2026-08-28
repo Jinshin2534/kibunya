@@ -1,3 +1,5 @@
+import { computeThumbnailSize } from '../lib/thumbnail.js'
+
 export function grabFrame(videoEl, canvasEl) {
   const width = videoEl.videoWidth
   const height = videoEl.videoHeight
@@ -9,10 +11,10 @@ export function grabFrame(videoEl, canvasEl) {
 }
 
 export function makeThumbnail(canvasEl, maxSide = 240, quality = 0.7) {
-  const scale = Math.min(1, maxSide / Math.max(canvasEl.width, canvasEl.height))
+  const { width, height } = computeThumbnailSize(canvasEl.width, canvasEl.height, maxSide)
   const t = document.createElement('canvas')
-  t.width = Math.round(canvasEl.width * scale)
-  t.height = Math.round(canvasEl.height * scale)
+  t.width = width
+  t.height = height
   t.getContext('2d').drawImage(canvasEl, 0, 0, t.width, t.height)
   return new Promise((resolve) => t.toBlob(resolve, 'image/jpeg', quality))
 }

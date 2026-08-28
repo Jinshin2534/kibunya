@@ -1,3 +1,5 @@
+// 所有権の契約: 返した stream の所有者は呼び出し側。使い終わったら必ず
+// stopCamera に渡すこと（渡し忘れるとカメラのライトが点いたままになる）。
 export async function startCamera(videoEl) {
   const stream = await navigator.mediaDevices.getUserMedia({
     video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 720 } },
