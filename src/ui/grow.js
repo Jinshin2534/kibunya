@@ -69,4 +69,9 @@ export function renderGrow(root, { entries, trained, baseline }) {
     }
     root.append(panel)
   }
+
+  root.insertAdjacentHTML('beforeend',
+    `<p class="note">的中率は、記録を1件ずつ抜いて学習し直したときの成績です。
+     水増しはしていません。当てられないものは当てられないと出します。
+     ただし正則化の強さ（λ）もこの同じ検証で選んでいるため、この数字はほんの少し甘めに出ます。</p>`)
 }
