@@ -86,3 +86,6 @@ h3 { font-size: 13px; color: var(--muted); margin: 18px 0 6px; font-weight: 600;
 .thumb img, .thumb .ph { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; background: var(--line); display: block; transform: scaleX(-1); }
 .thumb small { color: var(--muted); display: block; }
 .thumb b { font-size: 11px; }
+.danger-zone { border-color: var(--ng); }
+.switch { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+.filebtn { display: inline-block; padding: 12px 22px; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; margin-left: 8px; }

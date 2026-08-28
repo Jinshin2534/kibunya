@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isValidDump, sortByDate } from '../src/lib/dump.js'
+import { isValidDump, sortByDate, parseDumpJson } from '../src/lib/dump.js'
 
 describe('isValidDump', () => {
   it('正常なダンプは true', () => {
@@ -128,5 +128,37 @@ describe('sortByDate', () => {
     const result = sortByDate(rows)
     expect(rows).toEqual(original)
     expect(result).not.toBe(rows)
+  })
+})
+
+describe('parseDumpJson', () => {
+  it('妥当な JSON をパースしたオブジェクトを返す', () => {
+    expect(parseDumpJson('{"entries":[{"date":"2026-01-01"}]}')).toEqual({
+      entries: [{ date: '2026-01-01' }],
+    })
+  })
+
+  it('配列やプリミティブの JSON もそのまま返す（妥当性の判定は isValidDump の役目）', () => {
+    expect(parseDumpJson('[1,2,3]')).toEqual([1, 2, 3])
+    expect(parseDumpJson('null')).toBe(null)
+    expect(parseDumpJson('42')).toBe(42)
+  })
+
+  it('壊れた JSON は日本語のメッセージで投げる', () => {
+    expect(() => parseDumpJson('{not valid json')).toThrow('JSON として読み取れないファイルです')
+  })
+
+  it('空文字列も壊れた JSON として扱う', () => {
+    expect(() => parseDumpJson('')).toThrow('JSON として読み取れないファイルです')
+  })
+
+  it('元の SyntaxError のメッセージ（英語）は外に漏らさない', () => {
+    try {
+      parseDumpJson('<html>not json</html>')
+      throw new Error('ここには来ないはず')
+    } catch (err) {
+      expect(err.message).toBe('JSON として読み取れないファイルです')
+      expect(err.message).not.toMatch(/Unexpected|JSON\.parse/)
+    }
   })
 })

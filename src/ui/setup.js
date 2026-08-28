@@ -15,12 +15,14 @@ export function renderSetup(root, { onDone }) {
     毎日これと同じ撮り方をするので、いつもの場所・いつもの明るさで撮るのがおすすめです。</p>
   `
   const samples = []
-  const panel = createCapturePanel({
+  // today.js と同じ形: panel はこの関数のトップレベルで持ち、返す stop() が
+  // どの時点でも今動いているカメラを確実に止められるようにする。
+  let panel = createCapturePanel({
     shots: SHOTS,
     title: 'ふつうの顔を撮ります',
     onShot: ({ features, index }) => {
       samples.push(features)
-      if (index >= SHOTS) { panel.stop(); finish() }
+      if (index >= SHOTS) { panel.stop(); panel = null; finish() }
     },
   })
   root.append(panel.el)
@@ -42,5 +44,11 @@ export function renderSetup(root, { onDone }) {
     btn.textContent = 'はじめる'
     btn.onclick = () => onDone(baseline)
     root.append(btn)
+  }
+
+  // 画面から離れるとき（設定画面から再度セットアップに入った、タブ切り替えなど）、
+  // 撮影中のカメラが動いたままにならないように。
+  return {
+    stop() { panel?.stop() },
   }
 }

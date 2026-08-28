@@ -20,3 +20,18 @@ export function isValidDump(dump) {
 export function sortByDate(rows) {
   return [...rows].sort((a, b) => a.date.localeCompare(b.date))
 }
+
+/**
+ * インポートしたファイルの中身を読む。
+ * JSON.parse がそのまま投げるエラーは "Unexpected token..." のような英語の
+ * 構文エラーで、そのまま画面に出しても何が起きたか伝わらない。
+ * ここで日本語の一文に変換しておき、呼び出し側（app.js）はそのまま
+ * alert に出せるようにする。
+ */
+export function parseDumpJson(text) {
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new Error('JSON として読み取れないファイルです')
+  }
+}

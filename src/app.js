@@ -3,6 +3,7 @@ import { renderSetup } from './ui/setup.js'
 import { renderToday } from './ui/today.js'
 import { renderGrow } from './ui/grow.js'
 import { renderLog } from './ui/log.js'
+import { renderSettings } from './ui/settings.js'
 import { analyze } from './pipeline.js'
 import { buildBaseline, toZ, pooledBaseline } from './lib/baseline.js'
 import { dateKey } from './lib/dates.js'
@@ -10,6 +11,7 @@ import { trainAll, predictAll, importance } from './lib/model.js'
 import { speak } from './lib/persona.js'
 import { FEATURE_NAMES } from './lib/features.js'
 import { makeRng, syntheticDay } from './lib/synthetic.js'
+import { parseDumpJson } from './lib/dump.js'
 import * as db from './store/db.js'
 
 const root = document.querySelector('#app')
@@ -21,7 +23,7 @@ const TABS = [
   { key: 'settings', label: '設定' },
 ]
 
-const state = { baseline: null, entries: [], trained: {}, tab: 'today', lastAnalysis: null }
+const state = { baseline: null, entries: [], trained: {}, tab: 'today', lastAnalysis: null, settings: null }
 
 // renderToday が撮影中のカメラを掴んでいるとき、離脱時に確実に止めるためのハンドル。
 // 同じ画面を再描画するときも先に呼ぶ（前の撮影が生き残ったまま新しい撮影を
@@ -31,6 +33,7 @@ let activeScreen = null
 async function load() {
   state.baseline = await db.getBaseline()
   state.entries = await db.allEntries()
+  state.settings = await db.getSettings()
   // 学習の X も、セットアップの 5 枚だけでなくこれまでの記録を混ぜ直した
   // 基準（Task 7 の pooledBaseline）で Z 化する。保存済みの entry.z は撮影時点の
   // 基準に固定されているので、基準が引き直されるたびに古い Z のまま学習することになる。
@@ -64,9 +67,12 @@ function render() {
 
   if (!state.baseline) {
     document.querySelector('#tabbar').innerHTML = ''
-    renderSetup(root, {
-      onDone: async (b) => { await db.setBaseline(b); state.baseline = b; render() },
-    })
+    // renderSetup も renderToday と同じ形で stop() を返す。ここは初回のオンボーディング
+    // だけでなく、設定画面の「撮り直す」で state.baseline を null に戻して再入場する
+    // 経路も通るため、離脱時にカメラを止められるよう activeScreen に必ず入れる。
+    activeScreen = renderSetup(root, {
+      onDone: async (b) => { await db.setBaseline(b); await load(); render() },
+    }) ?? null
     return
   }
   renderShell({ tabs: TABS, current: state.tab, onSelect: (k) => { state.tab = k; render() } })
@@ -98,6 +104,64 @@ function render() {
 
   if (state.tab === 'log') {
     renderLog(root, { entries: state.entries, trained: state.trained })
+    return
+  }
+
+  if (state.tab === 'settings') {
+    renderSettings(root, {
+      settings: state.settings, entries: state.entries, baseline: state.baseline,
+      actions: {
+        onClearAll: async () => {
+          // clearAll は baseline/entries/thumbs/settings の4ストア全てを1つの
+          // トランザクションで消す（store/db.js）。消した直後は state.baseline が
+          // null になるので、render() の先頭の分岐がそのままセットアップ画面へ導く。
+          await db.clearAll()
+          await load()
+          state.tab = 'today'
+          render()
+        },
+        onToggleThumbnails: async (on) => {
+          await db.setSettings({ keepThumbnails: on })
+          await load()
+          render()
+        },
+        onRebuildBaseline: () => {
+          // state.baseline を null にするだけで、render() の先頭の分岐が
+          // セットアップ画面（撮影パネル）を出す。撮り終えて「はじめる」を押すと
+          // onDone が新しい基準を保存し、この設定画面（state.tab は変わっていない）
+          // に戻ってくる。
+          state.baseline = null
+          render()
+        },
+        onExport: async () => {
+          // 書き出しは写真（thumbs）を含めない: base64 化すると JSON が肥大化するため。
+          const dump = await db.exportAll()
+          const url = URL.createObjectURL(new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' }))
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `kibunya-${dateKey(new Date())}.json`
+          // download 開始（クリック）のあとで revoke する。先に revoke すると
+          // まだ開始していないダウンロードが失敗することがある。
+          a.click()
+          URL.revokeObjectURL(url)
+        },
+        onImport: async (file) => {
+          try {
+            // JSON として壊れている場合は parseDumpJson が日本語のメッセージで投げる。
+            // 形は正しくても中身が不正な場合は db.importAll 側の isValidDump が
+            // 「読み込めるデータではありません」を投げる。どちらも err.message が
+            // そのまま日本語の文になっているので、alert にそのまま出せる。
+            const dump = parseDumpJson(await file.text())
+            await db.importAll(dump)
+            await load()
+            state.tab = 'log'
+            render()
+          } catch (err) {
+            alert(`読み込めませんでした: ${err.message}`)
+          }
+        },
+      },
+    })
     return
   }
 
