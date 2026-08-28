@@ -188,7 +188,7 @@ window.__app = {
   zOfLast() { return toZ(state.lastAnalysis?.features, pooledBaseline(state.baseline, state.entries)) },
   getState() { return state },
   async reload() { await load(); render() },
-  async reset() { await db.clearAll(); state.baseline = null; state.entries = []; state.trained = {}; render() },
+  async reset() { await db.clearAll(); await load(); render() },
 
   // カメラ無しで「育ち」「記録」を検証するための合成データ。
   // 相関のある値そのもの（決定的乱数・体調/眠さ/気分の式）は src/lib/synthetic.js
