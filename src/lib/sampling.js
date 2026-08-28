@@ -15,7 +15,7 @@ function finish(acc) {
 }
 
 export function sampleDisc(image, cx, cy, radius) {
-  if (!(radius > 0)) return null
+  if (!(radius > 0) || !Number.isFinite(radius)) return null
   const acc = { r: 0, g: 0, b: 0, n: 0 }
   const r2 = radius * radius
   const x0 = Math.floor(cx - radius), x1 = Math.ceil(cx + radius)
@@ -31,10 +31,16 @@ export function sampleDisc(image, cx, cy, radius) {
 }
 
 export function sampleGrid(image, box, step) {
-  const s = step > 0 ? step : 1
+  // 画素は整数の格子なので、開始点も歩幅も整数に丸めてから進む。
+  // 端数のまま進めると、丸めた先が重なって同じ画素を二度数え、平均が偏る。
+  const s = Math.max(1, Math.round(step > 0 ? step : 1))
+  const x0 = Math.round(box.x)
+  const y0 = Math.round(box.y)
+  const xEnd = x0 + Math.max(0, Math.round(box.w))
+  const yEnd = y0 + Math.max(0, Math.round(box.h))
   const acc = { r: 0, g: 0, b: 0, n: 0 }
-  for (let y = box.y; y < box.y + box.h; y += s) {
-    for (let x = box.x; x < box.x + box.w; x += s) {
+  for (let y = y0; y < yEnd; y += s) {
+    for (let x = x0; x < xEnd; x += s) {
       accumulate(image, x, y, acc)
     }
   }

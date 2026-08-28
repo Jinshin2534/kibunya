@@ -36,6 +36,10 @@ describe('sampleDisc', () => {
   it('半径が 0 以下なら null', () => {
     expect(sampleDisc(img, 5, 5, 0)).toBeNull()
   })
+  it('半径が有限でなければ null（無限ループを防ぐ）', () => {
+    expect(sampleDisc(makeImage(), 5, 5, Infinity)).toBeNull()
+    expect(sampleDisc(makeImage(), 5, 5, NaN)).toBeNull()
+  })
 })
 
 describe('sampleGrid', () => {
@@ -53,6 +57,18 @@ describe('sampleGrid', () => {
     const sNeg = sampleGrid(makeImage(), { x: 0, y: 0, w: 10, h: 10 }, -5)
     expect(s0).toEqual(s1)
     expect(sNeg).toEqual(s1)
+  })
+  it('端数の歩幅でも同じ画素を二度数えない（整数の歩幅と一致する）', () => {
+    const img = makeImage()
+    const box = { x: 0, y: 0, w: 10, h: 10 }
+    expect(sampleGrid(img, box, 0.6)).toEqual(sampleGrid(img, box, 1))
+    expect(sampleGrid(img, box, 2.4)).toEqual(sampleGrid(img, box, 2))
+  })
+
+  it('端数の原点でも整数の格子に揃える', () => {
+    const img = makeImage()
+    expect(sampleGrid(img, { x: 0.2, y: 0.2, w: 10, h: 10 }, 1))
+      .toEqual(sampleGrid(img, { x: 0, y: 0, w: 10, h: 10 }, 1))
   })
 })
 
