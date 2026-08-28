@@ -189,11 +189,11 @@ describe('extractFeatures', () => {
     expect(Number.isFinite(f.eyeOpenR)).toBe(true)
   })
 
-  it('顎の点が顎先と重なると jawSharp は180（角度計算の退化ベクトルガード、180度反転後の値）', () => {
+  it('顎の点が顎先と重なると jawSharp は0（角度が取れない退化ケース、他の特徴量と同じく情報なし）', () => {
     const rEqualsChin = featuresOf(makeFace({ [IDX.jawR]: { x: 0.50, y: 0.76, z: 0 } }))
     const lEqualsChin = featuresOf(makeFace({ [IDX.jawL]: { x: 0.50, y: 0.76, z: 0 } }))
-    expect(rEqualsChin.jawSharp).toBe(180)
-    expect(lEqualsChin.jawSharp).toBe(180)
+    expect(rEqualsChin.jawSharp).toBe(0)
+    expect(lEqualsChin.jawSharp).toBe(0)
   })
 
   it('underEyeL が null でも underEyeR だけで計算する（meanColor の片側 null 分岐）', () => {

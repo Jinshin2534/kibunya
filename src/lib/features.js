@@ -82,7 +82,10 @@ export function extractFeatures(points, colors) {
   const faceWidthLower = dist(p[IDX.jawL], p[IDX.jawR])
   const cheekFullness = (Math.abs(p[IDX.cheekL].x) + Math.abs(p[IDX.cheekR].x)) / 2
   // 顎での角度は、尖った顎ほど小さくなる。名前とラベル（鋭さ）に合わせて向きを反転する。
-  const jawSharp = 180 - angleAt(p[IDX.jawL], p[IDX.chin], p[IDX.jawR])
+  // 退化して角度が取れなかったときは、他の特徴量と同じく 0（＝情報なし）に倒す。
+  // ここで 180 を返すと「最大の鋭さ」という極端な外れ値になり、ベースラインを壊す。
+  const jawAngle = angleAt(p[IDX.jawL], p[IDX.chin], p[IDX.jawR])
+  const jawSharp = jawAngle > 0 ? 180 - jawAngle : 0
 
   const mouthCenterY = (p[IDX.mouthUpper].y + p[IDX.mouthLower].y) / 2
   const mouthCornerY = (p[IDX.mouthL].y + p[IDX.mouthR].y) / 2
