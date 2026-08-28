@@ -54,3 +54,22 @@ button:disabled { opacity: .45; cursor: default; }
 .row span { flex: 1; color: var(--muted); font-size: 13px; }
 .row b { font-variant-numeric: tabular-nums; }
 .row small { color: var(--muted); font-variant-numeric: tabular-nums; }
+.slider { display: block; margin: 14px 0; }
+.slider-head { display: flex; justify-content: space-between; font-size: 14px; }
+.slider-head b { color: var(--accent); }
+.slider input[type=range] { width: 100%; }
+.ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
+.ends i { font-style: normal; }
+.tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.tag input { display: none; }
+.tag span { display: inline-block; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; color: var(--muted); }
+.tag input:checked + span { border-color: var(--accent); color: var(--accent); }
+.newtag { width: 100%; padding: 10px; background: transparent; border: 1px solid var(--line); border-radius: 10px; color: var(--fg); font: inherit; margin-bottom: 14px; }
+.line { font-size: 17px; margin: 6px 0 14px; }
+.meter { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+.meter span { width: 3em; color: var(--muted); font-size: 13px; }
+.meter .bar { flex: 1; height: 8px; background: var(--line); border-radius: 999px; overflow: hidden; }
+.meter .bar i { display: block; height: 100%; background: var(--accent); }
+.meter b { width: 2.4em; text-align: right; font-variant-numeric: tabular-nums; }
+b.hit { color: var(--ok); }
+b.miss { color: var(--ng); }
