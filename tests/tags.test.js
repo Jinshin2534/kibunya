@@ -80,19 +80,29 @@ describe('tagStats', () => {
     expect(r[0].tag).toBe('tag')
   })
 
-  it('同じ件数のタグは安定した順序（Mapの順序）で返す', () => {
-    const sameCount = [
+  it('等件数のタグは先に見られた順で返し、より多い件数のタグが先に来る', () => {
+    const mixed = [
       entry('2026-01-01', ['alpha'], 0),
       entry('2026-01-02', ['alpha'], 0),
       entry('2026-01-03', ['alpha'], 0),
       entry('2026-01-04', ['beta'], 0),
       entry('2026-01-05', ['beta'], 0),
       entry('2026-01-06', ['beta'], 0),
+      entry('2026-01-07', ['gamma'], 0),  // count=1 < 3、フィルタ対象外
+      entry('2026-01-08', ['delta'], 0),
+      entry('2026-01-09', ['delta'], 0),
+      entry('2026-01-10', ['delta'], 0),
+      entry('2026-01-11', ['delta'], 0),  // count=4 > 3、先に来る
     ]
-    const r = tagStats(sameCount, 3)
-    expect(r.length).toBe(2)
-    expect(r[0].count).toBe(3)
+    const r = tagStats(mixed, 3)
+    // deltaがcount=4なので最初
+    expect(r[0].tag).toBe('delta')
+    expect(r[0].count).toBe(4)
+    // alphaとbetaは等count=3だが、alphaが先に見られたので先に来る（Mapの順序）
+    expect(r[1].tag).toBe('alpha')
     expect(r[1].count).toBe(3)
+    expect(r[2].tag).toBe('beta')
+    expect(r[2].count).toBe(3)
   })
 
   it('デルタが正確に 0 でも計算できる', () => {
