@@ -4,6 +4,13 @@ const DB_NAME = 'kibunya'
 const DB_VERSION = 1
 const STORES = { baseline: 'id', entries: 'date', thumbs: 'date', settings: 'id' }
 
+/**
+ * importAll が投げるエラーメッセージ。app.js の import ハンドラは
+ * これを err.message と文字列の直接比較で判定しているので、ここを編集したら
+ * リテラルのコピーではなくこの定数を使っているか（src/app.js）を確認すること。
+ */
+export const INVALID_DUMP_ERROR = '読み込めるデータではありません'
+
 let dbPromise = null
 
 function openDb() {
@@ -46,7 +53,6 @@ function tx(store, mode, fn) {
 export const getBaseline = () => tx('baseline', 'readonly', (s) => s.get('current'))
 export const setBaseline = (b) => tx('baseline', 'readwrite', (s) => s.put({ ...b, id: 'current' }))
 
-export const getEntry = (date) => tx('entries', 'readonly', (s) => s.get(date))
 export const putEntry = (entry) => tx('entries', 'readwrite', (s) => s.put(entry))
 export const allEntries = () =>
   tx('entries', 'readonly', (s) => s.getAll())
@@ -83,7 +89,7 @@ export async function exportAll() {
 }
 
 export async function importAll(dump) {
-  if (!isValidDump(dump)) throw new Error('読み込めるデータではありません')
+  if (!isValidDump(dump)) throw new Error(INVALID_DUMP_ERROR)
   const db = await openDb()
   const names = Object.keys(STORES)
   // 消去と書き込みを1つのトランザクションにまとめる。

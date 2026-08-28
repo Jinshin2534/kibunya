@@ -1,5 +1,12 @@
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
+/**
+ * parseDumpJson が投げるエラーメッセージ。app.js の import ハンドラは
+ * これを err.message と文字列の直接比較で判定しているので、ここを編集したら
+ * リテラルのコピーではなくこの定数を使っているか（src/app.js）を確認すること。
+ */
+export const PARSE_JSON_ERROR = 'JSON として読み取れないファイルです'
+
 function isPlainObject(v) {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
 }
@@ -32,6 +39,6 @@ export function parseDumpJson(text) {
   try {
     return JSON.parse(text)
   } catch {
-    throw new Error('JSON として読み取れないファイルです')
+    throw new Error(PARSE_JSON_ERROR)
   }
 }

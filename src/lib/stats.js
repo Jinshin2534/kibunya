@@ -42,15 +42,6 @@ export function matmul(A, B) {
   return C
 }
 
-export function matvec(A, v) {
-  return A.map((row) => row.reduce((s, a, j) => s + a * v[j], 0))
-}
-
-export function identity(n) {
-  return Array.from({ length: n }, (_, i) =>
-    Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)))
-}
-
 // 部分ピボット付きガウス消去。特異なら null。
 export function solve(A, b) {
   const n = A.length

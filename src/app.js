@@ -11,7 +11,7 @@ import { trainAll, predictAll, perTargetOf, importance } from './lib/model.js'
 import { speak } from './lib/persona.js'
 import { FEATURE_NAMES } from './lib/features.js'
 import { makeRng, syntheticDay } from './lib/synthetic.js'
-import { parseDumpJson } from './lib/dump.js'
+import { parseDumpJson, PARSE_JSON_ERROR } from './lib/dump.js'
 import * as db from './store/db.js'
 
 const root = document.querySelector('#app')
@@ -163,13 +163,16 @@ function render() {
           URL.revokeObjectURL(url)
         },
         onImport: async (file) => {
-          // JSON として壊れている場合は parseDumpJson が日本語のメッセージで投げる。
+          // JSON として壊れている場合は parseDumpJson が PARSE_JSON_ERROR（lib/dump.js）で投げる。
           // 形は正しくても中身が不正な場合は db.importAll 側の isValidDump が
-          // 「読み込めるデータではありません」を投げる。どちらも err.message が
+          // INVALID_DUMP_ERROR（store/db.js）を投げる。どちらも err.message が
           // そのまま日本語の文になっているので、alert にそのまま出せる。
           // それ以外（IndexedDB の書き込み失敗など）は err.message が英語や
           // 実装依存の文言になり得るので、生では出さず定型文にする。
-          const KNOWN_IMPORT_ERRORS = new Set(['JSON として読み取れないファイルです', '読み込めるデータではありません'])
+          // 定数を throw 側からインポートして比較するのは、メッセージ文言を
+          // どちらかだけ変えたときに、この判定がこっそり定型文（フォールバック）へ
+          // 落ちてしまう（＝せっかくの詳しいエラーが握りつぶされる）事故を防ぐため。
+          const KNOWN_IMPORT_ERRORS = new Set([PARSE_JSON_ERROR, db.INVALID_DUMP_ERROR])
           try {
             const dump = parseDumpJson(await file.text())
             await db.importAll(dump)
@@ -186,8 +189,8 @@ function render() {
     return
   }
 
-  root.innerHTML = `<h1>${TABS.find((t) => t.key === state.tab).label}</h1>
-    <p class="note">準備中</p>`
+  // ここには来ない: state.tab は TABS のキー（'today'|'grow'|'log'|'settings'）
+  // からしか代入されず、その4つは全てこの上で return している。
 }
 
 await load()

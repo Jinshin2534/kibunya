@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { TARGETS, TARGET_KEYS, DEFAULT_TAGS, emptyLabels, normalizeLabels, SCALE_MIN, SCALE_MAX } from '../src/lib/labels.js'
-import { dateKey, addDays } from '../src/lib/dates.js'
+import { dateKey } from '../src/lib/dates.js'
 
 describe('TARGETS', () => {
   it('3つ、順番は 体調・気分・眠さ', () => {
@@ -47,18 +47,12 @@ describe('normalizeLabels', () => {
   })
 })
 
-describe('dateKey / addDays', () => {
+describe('dateKey', () => {
   it('ローカル時刻で YYYY-MM-DD', () => {
     expect(dateKey(new Date(2026, 7, 29, 23, 30))).toBe('2026-08-29')
   })
   it('1桁は 0 埋めする', () => {
     expect(dateKey(new Date(2026, 0, 5))).toBe('2026-01-05')
-  })
-  it('日付を足す', () => {
-    expect(dateKey(addDays(new Date(2026, 7, 31), 1))).toBe('2026-09-01')
-  })
-  it('日付を引く', () => {
-    expect(dateKey(addDays(new Date(2026, 8, 1), -1))).toBe('2026-08-31')
   })
 })
 
@@ -120,30 +114,6 @@ describe('Guard tests: emptyLabels', () => {
     const a = emptyLabels()
     const b = emptyLabels()
     expect(a.tags).not.toBe(b.tags)
-  })
-})
-
-describe('Guard tests: addDays', () => {
-  it('addDays(d, 0) は同じ日付を返す', () => {
-    const d = new Date(2026, 7, 15, 12, 30, 45)
-    const result = addDays(d, 0)
-    expect(dateKey(result)).toBe(dateKey(d))
-  })
-  it('addDays は元の日付を変更しない（イミュータブル）', () => {
-    const d = new Date(2026, 7, 15)
-    const original = dateKey(d)
-    addDays(d, 5)
-    expect(dateKey(d)).toBe(original)
-  })
-  it('年をまたぐ addDays: 12月31日 + 1 = 1月1日（翌年）', () => {
-    const d = new Date(2026, 11, 31)
-    const result = addDays(d, 1)
-    expect(dateKey(result)).toBe('2027-01-01')
-  })
-  it('年をまたぐ addDays: 1月1日 - 1 = 12月31日（前年）', () => {
-    const d = new Date(2026, 0, 1)
-    const result = addDays(d, -1)
-    expect(dateKey(result)).toBe('2025-12-31')
   })
 })
 

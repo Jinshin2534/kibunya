@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mean, sd, transpose, matmul, matvec, identity, solve, inverse, pearson } from '../src/lib/stats.js'
+import { mean, sd, transpose, matmul, solve, inverse, pearson } from '../src/lib/stats.js'
 
 describe('mean / sd', () => {
   it('平均を返す', () => expect(mean([1, 2, 3, 4])).toBe(2.5))
@@ -14,12 +14,6 @@ describe('行列', () => {
   })
   it('掛ける', () => {
     expect(matmul([[1, 2], [3, 4]], [[5, 6], [7, 8]])).toEqual([[19, 22], [43, 50]])
-  })
-  it('ベクトルに掛ける', () => {
-    expect(matvec([[1, 2], [3, 4]], [1, 1])).toEqual([3, 7])
-  })
-  it('単位行列', () => {
-    expect(identity(2)).toEqual([[1, 0], [0, 1]])
   })
 })
 
