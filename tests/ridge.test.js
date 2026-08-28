@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { fitRidge, predictRidge, looPredictions, selectLambda, LAMBDAS } from '../src/lib/ridge.js'
+import { mean } from '../src/lib/stats.js'
 
 // 決定的な擬似乱数
 function rng(seed) {
@@ -29,12 +30,15 @@ describe('fitRidge', () => {
     expect(m.w[3]).toBeCloseTo(0, 1)
   })
 
-  it('λ を大きくすると重みが 0 に縮む（切片は縮まない）', () => {
+  it('λ を大きくすると重みは 0 に縮むが、切片は縮まない（罰則がかかっていない証拠）', () => {
     const { X, y } = makeData({ n: 100, seed: 5 })
     const loose = fitRidge(X, y, 0.001)
-    const tight = fitRidge(X, y, 1000)
+    const tight = fitRidge(X, y, 1e6)
     expect(Math.abs(tight.w[0])).toBeLessThan(Math.abs(loose.w[0]))
-    expect(tight.intercept).toBeCloseTo(3, 1)
+    // λ→∞ では重みが消え、切片は y の標本平均そのものに収束する。
+    // 切片にも罰則をかけている実装だと、ここが 0 に向かって落ちるので落第する。
+    expect(tight.intercept).toBeCloseTo(mean(y), 3)
+    expect(Math.abs(tight.intercept)).toBeGreaterThan(1)
   })
 
   it('データが特徴量より少なくても λ>0 なら解ける', () => {

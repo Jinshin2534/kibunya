@@ -42,8 +42,10 @@ export function looPredictions(X, y, lambda) {
   const model = fitRidge(X, y, lambda)
   if (!model) return null
   const Xa = augment(X)
+  // fitRidge が同じ A = normalMatrix(Xa, lambda) を solve() で既に解けている。
+  // solve() の特異判定（ピボットの大小）は A だけで決まり b には依存しないので、
+  // 同じ A に対する inverse() がここで null になることはない。
   const Ainv = inverse(normalMatrix(Xa, lambda))
-  if (!Ainv) return null
 
   const out = []
   const yMean = mean(y)
