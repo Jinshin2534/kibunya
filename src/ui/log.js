@@ -5,14 +5,19 @@ import { TARGETS } from '../lib/labels.js'
 import { similarDays } from '../lib/neighbors.js'
 import { tagStats } from '../lib/tags.js'
 import { importance } from '../lib/model.js'
+import { toZ } from '../lib/baseline.js'
 import { getThumb } from '../store/db.js'
 
-export function renderLog(root, { entries, trained }) {
+export function renderLog(root, { entries, trained, baseline }) {
   root.innerHTML = `<h1>記録</h1><p class="note">${entries.length} 件</p>`
   if (!entries.length) {
     root.insertAdjacentHTML('beforeend', '<div class="panel"><p class="note">まだ記録がありません。</p></div>')
     return
   }
+
+  // 保存されている z は「撮ったその日の基準」で測った値なので、日によって物差しが違う。
+  // 画面に出す前に、いまの基準で全部を測り直す（学習が designOf でしているのと同じこと）。
+  const scaled = entries.map((e) => ({ ...e, z: toZ(e.features, baseline) }))
 
   // ── 顔の特徴量 と 自己申告 の重ね合わせ ─────────────────
   const chart = document.createElement('div')
@@ -38,8 +43,8 @@ export function renderLog(root, { entries, trained }) {
   const drawChart = () => {
     const f = chart.querySelector('.pick-feature').value
     const t = chart.querySelector('.pick-target').value
-    const rawA = entries.map((e) => e.z?.[f] ?? 0)
-    const rawB = entries.map((e) => e.labels?.[t] ?? 3)
+    const rawA = scaled.map((e) => e.z?.[f] ?? 0)
+    const rawB = scaled.map((e) => e.labels?.[t] ?? 3)
     slot.innerHTML = linesSvg({
       series: [
         { values: normalize(rawA), color: 'var(--accent)', label: FEATURE_LABELS_JA[f] },
@@ -53,8 +58,8 @@ export function renderLog(root, { entries, trained }) {
   drawChart()
 
   // ── 似ている日 ──────────────────────────────────────
-  const latest = entries[entries.length - 1]
-  const near = similarDays(latest.z, entries, 3, latest.date)
+  const latest = scaled[scaled.length - 1]
+  const near = similarDays(latest.z, scaled, 3, latest.date)
   if (near.length) {
     root.insertAdjacentHTML('beforeend', `<div class="panel">
       <h2>最後に撮った顔に似ている日</h2>
@@ -67,7 +72,7 @@ export function renderLog(root, { entries, trained }) {
   }
 
   // ── タグ別の傾向 ────────────────────────────────────
-  const tags = tagStats(entries, 3)
+  const tags = tagStats(scaled, 3)
   if (tags.length) {
     root.insertAdjacentHTML('beforeend', `<div class="panel">
       <h2>タグが付いた日の顔</h2>

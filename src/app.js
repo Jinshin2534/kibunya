@@ -104,7 +104,8 @@ function render() {
   }
 
   if (state.tab === 'log') {
-    renderLog(root, { entries: state.entries, trained: state.trained })
+    const scale = pooledBaseline(state.baseline, state.entries)
+    renderLog(root, { entries: state.entries, trained: state.trained, baseline: scale })
     return
   }
 
