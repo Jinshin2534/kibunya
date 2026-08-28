@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
   MIN_ENTRIES, hitRate, rSquared, trainTarget, trainAll,
-  importance, confidenceOf, predictAll, learningCurve,
+  importance, confidenceOf, predictAll, learningCurve, perTargetOf,
 } from '../src/lib/model.js'
 import { FEATURE_NAMES } from '../src/lib/features.js'
+import { pooledBaseline } from '../src/lib/baseline.js'
 
 function rng(seed) {
   let s = seed
@@ -122,6 +123,15 @@ describe('predictAll', () => {
   it('使える的が1つも無ければ null', () => {
     expect(predictAll(trainAll(makeEntries(3), IDENTITY_BASELINE), makeEntries(1)[0].features)).toBeNull()
   })
+  // predictAll が null を返す（=1つも使える的が無い）場面でも、reason だけは
+  // perTargetOf で別途取り出せる。app.js の predictFor はこれを使って
+  // 「記録がまだ足りない」と「顔からは読み取れない」を today.js に伝え分ける。
+  it('perTargetOf は predictAll が null のときも reason を返す', () => {
+    const trained = trainAll(makeEntries(3), IDENTITY_BASELINE)
+    const pt = perTargetOf(trained, makeEntries(1)[0].features)
+    expect(pt.condition.usable).toBe(false)
+    expect(pt.condition.reason).toBe('まだ記録が足りない')
+  })
   it('予測は 1〜5 に収める', () => {
     const entries = makeEntries(60, { signal: 6, seed: 29 })
     const p = predictAll(trainAll(entries, IDENTITY_BASELINE), Object.fromEntries(FEATURE_NAMES.map((n) => [n, 6])))
@@ -163,6 +173,51 @@ describe('learningCurve', () => {
     // 欠損は 8 番目（index 7）の記録なので、先頭 5,6,7 件までは欠損を含まず学習できる。
     // 先頭 8 件目以降は必ず欠損記録を含むので、以降の k はすべて欠落する。
     expect(curve.map((p) => p.n)).toEqual([5, 6, 7])
+  })
+
+  // 先読み防止（Task: 学習曲線は「その時点までの記録」だけでベースラインを
+  // 引き直すこと）。前半 5 件は eyeOpenL がごく狭い範囲（-0.5〜0.5）にきれいな
+  // 線形の signal を持つが、後半 15 件は同じ特徴量がはるかに広い範囲
+  // （±100）でランダムに散らばる。もし k=5 の点を「全期間でプールした基準」
+  // （先読み版）で測ると、狭い前半の Z が広い後半の分散に押しつぶされてほぼ 0
+  // に潰れ、学習も的中率も崩れる。「その時点（先頭5件）だけでプールした基準」
+  // （正しい実装）なら前半自身の広がりで測られ、signal がそのまま残る。
+  // 実際に model.js を直接叩いて両者が食い違うことを確認済み
+  // （lookAhead: hitRate 0.2 / usable false、prefixOnly: hitRate 1 / usable true）。
+  it('先読みしない: k=5 の点は先頭5件だけでプールした基準で測られる', () => {
+    const RAW_BASELINE = {}
+    const PREFIX_EO = [-0.5, -0.25, 0, 0.25, 0.5]
+    const PREFIX_LABELS = [1, 2, 3, 4, 5]
+    const r = rng(99)
+    const entries = []
+    for (let i = 0; i < 20; i++) {
+      const features = Object.fromEntries(FEATURE_NAMES.map((n) => [n, 0]))
+      let v
+      if (i < MIN_ENTRIES) {
+        features.eyeOpenL = PREFIX_EO[i]
+        v = PREFIX_LABELS[i]
+      } else {
+        features.eyeOpenL = (r() - 0.5) * 200
+        v = Math.max(1, Math.min(5, Math.round(3 + (r() - 0.5))))
+      }
+      entries.push({ date: `2026-02-${String(i + 1).padStart(2, '0')}`,
+                     features, labels: { condition: v, mood: 3, sleepiness: v } })
+    }
+    const prefix = entries.slice(0, MIN_ENTRIES)
+
+    // 学習曲線が実際に返す k=5 の点
+    const curve = learningCurve(entries, 'condition', RAW_BASELINE)
+    const k5 = curve.find((p) => p.n === MIN_ENTRIES)
+
+    // 「正しい」比較対象: 先頭5件だけでプールした基準
+    const prefixOnly = trainTarget(prefix, 'condition', pooledBaseline(RAW_BASELINE, prefix))
+    // 「先読み」比較対象: 全20件でプールした基準を使い回す（旧実装が実質やっていたこと）
+    const lookAhead = trainTarget(prefix, 'condition', pooledBaseline(RAW_BASELINE, entries))
+
+    expect(prefixOnly.usable).toBe(true)
+    expect(lookAhead.usable).toBe(false)
+    expect(k5?.hitRate).toBe(prefixOnly.hitRate)
+    expect(k5?.hitRate).not.toBe(lookAhead.hitRate)
   })
 })
 

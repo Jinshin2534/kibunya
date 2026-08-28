@@ -15,6 +15,19 @@ function unreadableNote(prediction) {
   return `<p class="note">${out.map((t) => t.label).join('・')} は、まだ顔から読み取れません。</p>`
 }
 
+/**
+ * 使える的が1つも無いとき、原因が「記録がまだ足りない」なのか
+ * 「これだけ記録があっても顔からは読み取れない（r² ≤ 0）」なのかを見分ける。
+ * 後者を「記録がたまれば見立てを言うようになる」と言うのは、届かないかもしれない
+ * 期待を持たせる嘘になる（育ち画面の「まだ顔から当てられません」と食い違ってもいた）。
+ * 全ターゲットの reason が「顔からは読み取れない」で揃っているときだけ true。
+ * 1つでも「まだ記録が足りない」が混ざっていれば、素直に「記録が足りない」と言う。
+ */
+function allUnreadableByFace(perTarget) {
+  const reasons = Object.values(perTarget ?? {}).map((p) => p.reason)
+  return reasons.length > 0 && reasons.every((r) => r === '顔からは読み取れない')
+}
+
 export function renderToday(root, { baseline, todayEntry, onSaved, predictFor, now = new Date() }) {
   const date = dateKey(now)
   // start() が「もう一度撮る」ボタン経由でも呼べるよう、panel はこの関数の
@@ -43,17 +56,21 @@ export function renderToday(root, { baseline, todayEntry, onSaved, predictFor, n
     // 今日を除いた記録＋そのプールされた基準で Z 化し直す（app.js 側）ので、
     // ここで baseline（今日を含む基準）で作った z を渡すと Z の物差しがずれる。
     const prediction = predictFor ? predictFor(features) : null
+    const usable = readableTargets(prediction)
 
     root.innerHTML = `<h1>今日</h1><p class="note">${date}</p>`
     const guess = document.createElement('div')
     guess.className = 'panel'
-    if (!prediction) {
-      guess.innerHTML = `<h2>まだ、あなたのことがわからない</h2>
-        <p class="note">記録がたまると見立てを言うようになります。今日はまず答え合わせだけ。</p>`
+    if (!usable.length) {
+      guess.innerHTML = allUnreadableByFace(prediction?.perTarget)
+        ? `<h2>顔からは読み取れません</h2>
+          <p class="note">これだけ記録があっても、今日の顔にコンディションの手がかりは見つかりませんでした。今日はまず答え合わせだけ。</p>`
+        : `<h2>まだ、あなたのことがわからない</h2>
+          <p class="note">記録がたまると見立てを言うようになります。今日はまず答え合わせだけ。</p>`
     } else {
       guess.innerHTML = `<h2>気分屋の見立て</h2>
         <p class="line">${prediction.line}</p>
-        ${readableTargets(prediction).map((t) => `<div class="meter"><span>${t.label}</span>
+        ${usable.map((t) => `<div class="meter"><span>${t.label}</span>
           <div class="bar"><i style="width:${scaleToPercent(prediction.values[t.key])}%"></i></div>
           <b>${prediction.values[t.key].toFixed(1)}</b></div>`).join('')}
         ${unreadableNote(prediction)}
@@ -66,7 +83,7 @@ export function renderToday(root, { baseline, todayEntry, onSaved, predictFor, n
         const entry = {
           date, capturedAt: now.getTime(),
           features, z, quality, labels,
-          prediction: prediction ? prediction.values : null,
+          prediction: usable.length ? prediction.values : null,
         }
         await putEntry(entry)
         const s = await getSettings()

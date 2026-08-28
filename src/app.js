@@ -7,7 +7,7 @@ import { renderSettings } from './ui/settings.js'
 import { analyze } from './pipeline.js'
 import { buildBaseline, toZ, pooledBaseline } from './lib/baseline.js'
 import { dateKey } from './lib/dates.js'
-import { trainAll, predictAll, importance } from './lib/model.js'
+import { trainAll, predictAll, perTargetOf, importance } from './lib/model.js'
 import { speak } from './lib/persona.js'
 import { FEATURE_NAMES } from './lib/features.js'
 import { makeRng, syntheticDay } from './lib/synthetic.js'
@@ -51,7 +51,13 @@ function predictFor(features, now = new Date()) {
   const trained = trainAll(past, scale)
   const z = toZ(features, scale)
   const p = predictAll(trained, z)
-  if (!p) return null
+  if (!p) {
+    // 使える的が1つも無い。それでも perTarget（的ごとの reason）は返す。
+    // today.js はここを見て「記録がまだ足りない」のか「これだけ記録があっても
+    // 顔からは読み取れない」のかを言い分ける（前者は待てば変わるかもしれない
+    // が、後者を「記録がたまれば」と言うのは届かないかもしれない期待を持たせる嘘になる）。
+    return { values: {}, confidence: 0, perTarget: perTargetOf(trained, z), line: null }
+  }
   const usableKey = Object.keys(p.values)[0]
   const top = usableKey ? importance(trained[usableKey].model)[0] : null
   return {
@@ -105,8 +111,10 @@ function render() {
   }
 
   if (state.tab === 'grow') {
-    const scale = pooledBaseline(state.baseline, state.entries)
-    renderGrow(root, { entries: state.entries, trained: state.trained, baseline: scale })
+    // baseline は state.baseline（セットアップ時点の生の基準）をそのまま渡す。
+    // renderGrow 内の学習曲線（learningCurve）は先読みを避けるため、
+    // 表示時点までの記録だけでこの基準を毎回プールし直す（lib/model.js）。
+    renderGrow(root, { entries: state.entries, trained: state.trained, baseline: state.baseline })
     return
   }
 

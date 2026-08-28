@@ -5,11 +5,11 @@ import { growLine } from '../lib/persona.js'
 /**
  * AI の成績表。当てられていない的は、当てられていないと書く。
  *
- * baseline は「学習曲線」を引き直すために要る。学習曲線は entries を先頭から
- * k 件ずつ切って毎回 trainTarget → toZ で Z 化するので、渡さないと Task 7 の
- * pooledBaseline ではなく undefined になり、toZ が全特徴量を 0 として扱ってしまう
- * （設計点1: プールした基準は toZ・trainAll・learningCurve のすべてに要る）。
- * 呼び出し側（app.js）は state.trained と同じ pooledBaseline(state.baseline, state.entries) を渡すこと。
+ * baseline は「学習曲線」を引き直すために要る。学習曲線（lib/model.js の
+ * learningCurve）は entries を先頭から k 件ずつ切り、その時点までの記録だけで
+ * 毎回プールし直した基準で Z 化する（先読み防止）。そのためここで渡す baseline は
+ * 既にプールしたもの（state.trained が使っているもの）ではなく、
+ * セットアップ時点の生の基準（state.baseline）であること。呼び出し側（app.js）を参照。
  */
 export function renderGrow(root, { entries, trained, baseline }) {
   root.innerHTML = `<h1>育ち</h1>

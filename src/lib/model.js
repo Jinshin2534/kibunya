@@ -1,7 +1,7 @@
 import { fitRidge, predictRidge, looPredictions, selectLambda } from './ridge.js'
 import { FEATURE_NAMES, FEATURE_LABELS_JA, toVector } from './features.js'
 import { TARGET_KEYS, SCALE_MIN, SCALE_MAX } from './labels.js'
-import { toZ } from './baseline.js'
+import { toZ, pooledBaseline } from './baseline.js'
 import { mean } from './stats.js'
 
 export const MIN_ENTRIES = 5
@@ -85,12 +85,16 @@ export function confidenceOf({ r2, n, z }) {
 
 const clampScale = (v) => Math.max(SCALE_MIN, Math.min(SCALE_MAX, v))
 
-export function predictAll(trained, z) {
-  const x = toVector(z)
-  const values = {}
+/**
+ * 的ごとの「使えるか／使えないなら何故か」を出す。predictAll と、
+ * predictAll が null を返す（=1つも使える的が無い）場面の両方から使われる。
+ * 後者では predictAll 自身は null しか返せない（値が1つも無いので）が、
+ * 呼び出し側（app.js の predictFor）はここを別途呼んで reason だけ取り出し、
+ * 「記録がまだ足りない」のか「これだけあっても顔からは読み取れない」のかを
+ * 画面（today.js）に正直に伝える。
+ */
+export function perTargetOf(trained, z) {
   const perTarget = {}
-  const confidences = []
-
   for (const key of TARGET_KEYS) {
     const t = trained?.[key]
     if (!t) { perTarget[key] = { usable: false, reason: 'まだ記録が足りない' }; continue }
@@ -99,9 +103,21 @@ export function predictAll(trained, z) {
       usable: t.usable, r2: t.r2, hitRate: t.hitRate, n: t.n, confidence: conf,
       reason: t.usable ? null : '顔からは読み取れない',
     }
-    if (!t.usable) continue
+  }
+  return perTarget
+}
+
+export function predictAll(trained, z) {
+  const x = toVector(z)
+  const perTarget = perTargetOf(trained, z)
+  const values = {}
+  const confidences = []
+
+  for (const key of TARGET_KEYS) {
+    const t = trained?.[key]
+    if (!t || !t.usable) continue
     values[key] = clampScale(predictRidge(t.model, x))
-    confidences.push(conf)
+    confidences.push(perTarget[key].confidence)
   }
 
   if (!confidences.length) return null
@@ -111,7 +127,13 @@ export function predictAll(trained, z) {
 export function learningCurve(entries, key, baseline) {
   const curve = []
   for (let k = MIN_ENTRIES; k <= entries.length; k++) {
-    const t = trainTarget(entries.slice(0, k), key, baseline)
+    const prefix = entries.slice(0, k)
+    // baseline はここまでの記録（prefix）だけから毎回引き直す。
+    // 最終形（全期間）でプールした基準を全ての点に使い回すと、k=5 の点が
+    // まだ起きていない k=6〜末尾の記録の統計で測られることになり、
+    // 「その時点でどれだけ賢かったか」を表す学習曲線が先読みで歪む。
+    const scale = pooledBaseline(baseline, prefix)
+    const t = trainTarget(prefix, key, scale)
     if (t) curve.push({ n: k, hitRate: t.hitRate })
   }
   return curve
