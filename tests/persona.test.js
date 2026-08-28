@@ -217,3 +217,77 @@ describe('Guard: determinism の再確認（オブジェクト同一性ではな
     expect(speak(obj1)).toBe(speak(obj2)) // 内容は同じ
   })
 })
+
+describe('Guard: 自信のある出だしと空の本文が矛盾しない', () => {
+  it('confidence が高くても values が空なら言い切るオープナーにならない', () => {
+    const s = speak({ values: {}, confidence: 0.7, topFeature: null, seed: 'contradiction-1' })
+    expect(/今日ははっきりしてる|今日はわかりやすい|顔に書いてある/.test(s)).toBe(false)
+    expect(/自信ない|あてずっぽう|わからない/.test(s)).toBe(true)
+    expect(s).toContain('なんとも言えない')
+  })
+
+  it('confidence = 1.0 で values が空でも同様に控えめな出だしになる', () => {
+    const s = speak({ values: {}, confidence: 1.0, topFeature: null, seed: 'contradiction-2' })
+    expect(/今日ははっきりしてる|今日はわかりやすい|顔に書いてある/.test(s)).toBe(false)
+    expect(/自信ない|あてずっぽう|わからない/.test(s)).toBe(true)
+  })
+})
+
+describe('Guard: growLine の undefined/NaN 対策', () => {
+  it('n が無いときに "undefined" を出さない', () => {
+    const result = growLine({ usable: false, hitRate: 0.3 })
+    expect(result).not.toContain('undefined')
+    expect(result).not.toContain('NaN')
+  })
+
+  it('n が NaN のときに "NaN" を出さない', () => {
+    const result = growLine({ usable: false, n: NaN, hitRate: 0.3 })
+    expect(result).not.toContain('undefined')
+    expect(result).not.toContain('NaN')
+  })
+
+  it('hitRate が無いときに "NaN" を出さず、未計測（当てられません）扱いになる', () => {
+    const result = growLine({ usable: true, n: 50 })
+    expect(result).not.toContain('undefined')
+    expect(result).not.toContain('NaN')
+    expect(result).toContain('当てられません')
+  })
+
+  it('hitRate が NaN のときに "NaN" を出さず、未計測（当てられません）扱いになる', () => {
+    const result = growLine({ usable: true, n: 50, hitRate: NaN })
+    expect(result).not.toContain('undefined')
+    expect(result).not.toContain('NaN')
+    expect(result).toContain('当てられません')
+  })
+})
+
+describe('speak: mood（気分）が本文に反映される', () => {
+  it('mood が指定されると本文に含まれる', () => {
+    const s = speak({ values: { mood: 5 }, confidence: 0.5, topFeature: null, seed: 'mood-present' })
+    expect(s).toContain('かなり機嫌がいい')
+  })
+
+  it('mood が無いときは機嫌に関する語が含まれない', () => {
+    const s = speak({ values: { condition: 3 }, confidence: 0.5, topFeature: null, seed: 'mood-absent' })
+    expect(s).not.toContain('機嫌')
+  })
+
+  it('mood だけの values でも整った文が作れる', () => {
+    const s = speak({ values: { mood: 1 }, confidence: 0.5, topFeature: null, seed: 'mood-only' })
+    expect(s).toContain('かなり沈んでそう')
+    expect(s.endsWith('。')).toBe(true)
+  })
+})
+
+describe('Guard: プロトタイプチェーンのキーが出力に紛れ込まない', () => {
+  it('topFeature が "constructor" のとき because が入らない', () => {
+    const result = speak({ values: { condition: 3 }, topFeature: 'constructor', seed: 'test', confidence: 0.7 })
+    expect(result).not.toContain('に出てる')
+    expect(result).not.toContain('function')
+  })
+
+  it('topFeature が "toString" のとき because が入らない', () => {
+    const result = speak({ values: { condition: 3 }, topFeature: 'toString', seed: 'test', confidence: 0.7 })
+    expect(result).not.toContain('に出てる')
+  })
+})
