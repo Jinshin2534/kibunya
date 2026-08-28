@@ -95,7 +95,7 @@ describe('offAxisDeg', () => {
     expect(offAxisDeg(m)).toBeCloseTo(20, 6)
   })
 
-  it('行列が無ければ 0', () => expect(offAxisDeg(null)).toBe(0))
+  it('行列が無ければ null（未測定は正面扱いにしない）', () => expect(offAxisDeg(null)).toBe(null))
 
-  it('要素が足りない行列は 0', () => expect(offAxisDeg([1, 0, 0])).toBe(0))
+  it('要素が足りない行列も null（未測定は正面扱いにしない）', () => expect(offAxisDeg([1, 0, 0])).toBe(null))
 })

@@ -186,6 +186,10 @@ await load()
 render()
 
 window.__app = {
+  // matrix を省略して呼ぶと、offAxisDeg(null) が null（未測定）を返すため、
+  // quality.checks の direction は必ず不合格になる。これは正しい挙動 —
+  // 顔の向きを測っていないのに「正面だった」ことにしてゲートを通すのは事故のもと。
+  // 向きのチェックまで含めて緑にしたいテスト・検証では matrix を渡すこと。
   feedLandmarks(landmarks, { matrix = null, image = null, width = 640, height = 480 } = {}) {
     const r = analyze(landmarks, matrix, image, width, height, 0)
     state.lastAnalysis = r

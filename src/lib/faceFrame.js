@@ -49,7 +49,10 @@ export function toFaceFrame(landmarks, imageWidth, imageHeight) {
  * Euler 角の分解規約に依存しない。yaw と pitch をまとめて1つの数字で扱う。
  */
 export function offAxisDeg(matrix) {
-  if (!matrix || matrix.length < 16) return 0
+  // 行列が無い・壊れているときは「向きを測れていない」であって「正面だった」ではない。
+  // 0 を返すと quality.js の Number.isFinite ガードを素通りして未測定のまま
+  // ゲートに合格してしまうので、数値ではなく null を返して不合格側に倒す。
+  if (!matrix || matrix.length < 16) return null
   const fz = matrix[10] // 列優先 4x4 の (row2, col2)
   const c = Math.min(1, Math.max(-1, Math.abs(fz)))
   return (Math.acos(c) * 180) / Math.PI

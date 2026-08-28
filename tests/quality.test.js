@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { checkQuality, THRESHOLDS } from '../src/lib/quality.js'
+import { offAxisDeg } from '../src/lib/faceFrame.js'
 
 const good = {
   faceFound: true, offAxisDeg: 3, rollDeg: 2,
@@ -168,6 +169,15 @@ describe('checkQuality — 未測定は不合格', () => {
   it('motion が未指定/NaN だと still が落ちる', () => {
     expect(keyOf(checkQuality({ ...good, motion: undefined }), 'still').ok).toBe(false)
     expect(keyOf(checkQuality({ ...good, motion: NaN }), 'still').ok).toBe(false)
+  })
+
+  it('顔の向きが測れない（matrix が無い/壊れている）ときは direction が落ちる', () => {
+    // offAxisDeg(matrix) が null を返すケースをそのまま checkQuality に渡す。
+    // かつて 0（=正面）を返していたときは、他が全部良好だと direction まで
+    // 緑になって「向きを測れていない」のに ok になっていた。それを防いだことの確認。
+    expect(keyOf(checkQuality({ ...good, offAxisDeg: offAxisDeg(null) }), 'direction').ok).toBe(false)
+    expect(keyOf(checkQuality({ ...good, offAxisDeg: offAxisDeg([1, 0, 0]) }), 'direction').ok).toBe(false)
+    expect(checkQuality({ ...good, offAxisDeg: offAxisDeg(null) }).ok).toBe(false)
   })
 
   it('offAxisDeg が負の値で閾値を超えても落ちる', () => {
